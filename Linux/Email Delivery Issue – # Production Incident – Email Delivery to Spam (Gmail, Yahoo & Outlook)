@@ -1,0 +1,198 @@
+## Incident Summary
+
+A newly deployed production application was unable to send emails through the internal mail server. After restoring SMTP communication, 
+outbound emails were successfully transmitted but were consistently delivered to the **Spam/Junk** folder in **Gmail, Yahoo Mail, and 
+Microsoft Outlook**.
+
+The issue was traced to improper Sendmail relay configuration and missing DNS records required for sender identity verification. 
+After implementing the necessary Sendmail and DNS changes, emails were delivered directly to recipients' Inbox.
+
+---
+
+## Environment
+
+| Component | Details |
+|----------|---------|
+| Operating System | Red Hat Enterprise Linux |
+| Mail Server | Sendmail |
+| SMTP Relay | Microsoft Outlook SMTP Relay |
+| DNS Provider | NameSolutions |
+| Reverse DNS | AWS Hosted DNS |
+| Public Registry | APNIC |
+
+---
+
+## Problem Statement
+
+The application team reported that:
+
+- Emails were not being sent from the application.
+- SMTP relay showed deferred messages.
+- After restoring mail flow, emails sent to Gmail, Yahoo Mail, and Microsoft Outlook were delivered to Spam/Junk instead of Inbox.
+
+---
+
+## Symptoms
+
+- Application email notifications failed.
+- Deferred messages observed in the Sendmail mail queue.
+- Gmail delivered emails to Spam.
+- Yahoo Mail delivered emails to Spam.
+- Microsoft Outlook delivered emails to Junk.
+- Reverse DNS lookup failed for the public IP.
+
+---
+
+## Investigation
+
+### 1. Verified Sendmail Service
+
+- Checked Sendmail service status.
+- Verified SMTP connectivity.
+- Reviewed mail queue and logs.
+
+---
+
+### 2. SMTP Relay Configuration
+
+Initially, Sendmail Smart Host was configured using the mail server hostname.
+
+```text
+DSsmtp:mail.company.com
+```
+
+Observed that Sendmail resolved the hostname directly through DNS instead of the local `/etc/hosts` file, causing relay issues.
+
+Updated the Smart Host configuration to use the SMTP relay IP address instead.
+
+```text
+SMART_HOST smtp:<SMTP-Relay-IP>
+```
+
+After this change, email transmission resumed successfully.
+
+---
+
+### 3. Configured Domain Masquerading
+
+Configured Sendmail domain masquerading so that outgoing emails used the organization's domain instead of the Linux server hostname.
+
+This improved sender identity during SMTP communication.
+
+---
+
+### 4. Forward DNS Configuration
+
+Configured Forward DNS records in NameSolutions.
+
+Verified:
+
+- A Record
+- MX Record
+- Hostname resolution
+
+Forward DNS validation completed successfully.
+
+---
+
+### 5. Reverse DNS (PTR)
+
+Reverse DNS was not available from the public provider.
+
+Implemented Reverse DNS using AWS.
+
+Activities performed:
+
+- Created Reverse DNS zone.
+- Configured AWS authoritative name servers.
+- Added AWS name servers in NameSolutions.
+- Delegated the Reverse DNS zone through APNIC.
+- Created the PTR record for the public mail server IP.
+
+Verified successful reverse lookup.
+
+---
+
+## Root Cause
+
+The email server failed sender identity validation due to multiple configuration issues:
+
+- Smart Host hostname resolution issue.
+- Missing Reverse DNS (PTR) record.
+- Forward and Reverse DNS were not aligned.
+- Sender identity was incomplete.
+
+As a result, major email providers such as Gmail, Yahoo Mail, and Microsoft Outlook considered the emails suspicious and delivered them to Spam/Junk folders.
+
+---
+
+## Resolution
+
+- Configured Sendmail Smart Host using SMTP relay IP.
+- Enabled Sendmail domain masquerading.
+- Configured Forward DNS records.
+- Implemented Reverse DNS (PTR) using AWS.
+- Delegated Reverse DNS through APNIC.
+- Verified Forward and Reverse DNS consistency.
+- Performed end-to-end email delivery testing with Gmail, Yahoo Mail, and Microsoft Outlook.
+
+---
+
+## Validation
+
+Validated successful email delivery to:
+
+- Gmail
+- Yahoo Mail
+- Microsoft Outlook
+
+Verified:
+
+- SMTP relay
+- Forward DNS
+- Reverse DNS (PTR)
+- Mail headers
+- Inbox delivery
+
+---
+
+## Result
+
+| Before Fix | After Fix |
+|------------|-----------|
+| ❌ Application emails not sent | ✅ Application emails sent successfully |
+| ❌ Deferred SMTP messages | ✅ Immediate mail delivery |
+| ❌ Gmail → Spam | ✅ Gmail → Inbox |
+| ❌ Yahoo Mail → Spam | ✅ Yahoo Mail → Inbox |
+| ❌ Microsoft Outlook → Junk | ✅ Microsoft Outlook → Inbox |
+| ❌ Missing PTR Record | ✅ PTR Record Configured |
+| ❌ Forward/Reverse DNS mismatch | ✅ DNS validation successful |
+
+---
+
+## Technologies Used
+
+- Red Hat Enterprise Linux
+- Sendmail
+- SMTP Relay
+- Microsoft Outlook SMTP Relay
+- DNS
+- Forward DNS (A Record)
+- Reverse DNS (PTR)
+- AWS Hosted DNS
+- APNIC
+- NameSolutions
+- SMTP Troubleshooting
+- Email Deliverability
+- Linux System Administration
+
+---
+
+## Key Learnings
+
+- Configure both Forward and Reverse DNS before enabling production email services.
+- Always ensure Forward DNS and PTR records resolve to the same hostname.
+- Use IP-based Smart Host configuration when hostname resolution is unreliable.
+- Configure domain masquerading to present the correct sender identity.
+- Validate email deliverability with Gmail, Yahoo Mail, and Microsoft Outlook before production deployment.
+- Proper DNS configuration significantly improves email reputation and Inbox delivery.

@@ -1,0 +1,199 @@
+## Project Summary
+
+Migrated a production static web application from an AWS EC2 instance running **Nginx** with **Certbot SSL** to **Cloudflare Pages** 
+with **Cloudflare DNS** and managed SSL.
+
+The migration eliminated the need to manage EC2 infrastructure, Nginx configuration, Route 53 DNS, SSL certificate renewals, and server 
+maintenance while reducing operational costs.
+
+---
+## Existing Architecture
+```
+Internet
+      │
+      ▼
+Route 53
+      │
+      ▼
+AWS EC2
+      │
+      ▼
+Nginx Web Server
+      │
+      ▼
+Certbot SSL
+      │
+      ▼
+Static Website
+```
+## Challenges
+
+- EC2 instance required continuous maintenance.
+- Nginx configuration changes for every deployment.
+- Certbot SSL certificate renewal management.
+- Route 53 DNS administration.
+- EC2 compute and storage costs.
+- OS patching and security updates.
+- Monitoring and backup management.
+
+---
+
+## Solution
+
+Migrated the static website to **Cloudflare Pages**.
+
+Activities performed:
+
+- Created Cloudflare Pages project.
+- Deployed production static website.
+- Connected Git repository for automated deployments.
+- Added custom production domain.
+- Updated domain Name Server (NS) records to Cloudflare.
+- Configured Cloudflare DNS.
+- Enabled automatic SSL/TLS.
+- Verified HTTPS accessibility.
+- Tested application functionality after migration.
+
+---
+
+## New Architecture
+
+```
+Internet
+      │
+      ▼
+Cloudflare DNS
+      │
+      ▼
+Cloudflare Pages
+      │
+      ▼
+Managed SSL/TLS
+      │
+      ▼
+Static Website
+```
+
+---
+
+## DNS Migration
+
+Migrated domain management from AWS Route 53 to Cloudflare.
+
+Performed:
+
+- Updated NS records at the domain registrar.
+- Verified DNS propagation.
+- Configured required DNS records.
+- Added custom domain to Cloudflare Pages.
+- Validated DNS resolution.
+
+---
+
+## SSL Migration
+
+Previously:
+
+- Nginx
+- Let's Encrypt (Certbot)
+- Manual certificate renewal monitoring
+
+After migration:
+
+- Cloudflare Managed SSL
+- Automatic certificate provisioning
+- Automatic certificate renewal
+- HTTPS enabled without server-side configuration
+
+---
+
+## Benefits Achieved
+
+### Infrastructure Simplification
+
+Removed:
+
+- AWS EC2 instance
+- Nginx web server
+- Certbot
+- Route 53 DNS hosting
+- Server administration
+- SSL renewal tasks
+
+---
+
+### Cost Optimization
+
+Reduced infrastructure costs by eliminating:
+
+- EC2 compute charges
+- EBS storage costs
+- Route 53 hosted zone charges
+- Server maintenance overhead
+
+---
+
+### Operational Improvements
+
+- Zero server management
+- Automatic deployments from Git repository
+- Automatic SSL certificate management
+- Built-in global CDN
+- Improved website performance
+- Simplified DNS management
+- Reduced operational complexity
+
+---
+
+## Validation
+
+Verified:
+
+- Website accessibility
+- HTTPS functionality
+- Custom domain resolution
+- Automatic SSL certificate
+- DNS propagation
+- Static asset delivery
+- Browser compatibility
+
+---
+
+## Result
+
+| Before Migration | After Migration |
+|------------------|-----------------|
+| EC2 Hosted Website | Cloudflare Pages |
+| Route 53 DNS | Cloudflare DNS |
+| Nginx Web Server | Serverless Hosting |
+| Certbot SSL | Cloudflare Managed SSL |
+| Manual Server Maintenance | No Server Management |
+| Manual Deployments | Automated Git Deployments |
+| Higher Infrastructure Cost | Reduced Operational Cost |
+
+---
+
+## Technologies Used
+
+- Cloudflare Pages
+- Cloudflare DNS
+- Cloudflare SSL/TLS
+- Custom Domain Configuration
+- Git Integration
+- AWS EC2
+- Nginx
+- Certbot
+- Route 53
+- Static Website Hosting
+- DNS Management
+- Infrastructure Optimization
+
+---
+
+## Key Learnings
+
+- Static websites do not require dedicated virtual machines for hosting.
+- Cloudflare Pages simplifies deployment and infrastructure management.
+- Cloudflare Managed SSL eliminates manual certificate renewal.
+- Migrating DNS management to Cloudflare centralizes domain and SSL management.
+- Serverless static hosting significantly reduces operational effort and infrastructure costs while improving reliability and performance.

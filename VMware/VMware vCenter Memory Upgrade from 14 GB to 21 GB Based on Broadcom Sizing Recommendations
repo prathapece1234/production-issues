@@ -1,0 +1,179 @@
+**VMware vCenter Memory Upgrade from 14 GB to 21 GB Based on Broadcom Sizing Recommendations**
+
+## Overview
+
+During routine infrastructure monitoring, the VMware vCenter Server Appliance (VCSA) was consistently reporting memory utilization above **85%**. 
+Analysis confirmed that memory consumption was primarily due to essential vCenter services rather than abnormal processes.
+
+The existing memory allocation of **14 GB** was below the recommended sizing for the current environment, which consisted of **13 ESXi hosts and 
+104 virtual machines**.
+
+Based on the Broadcom sizing recommendations, a planned maintenance activity was scheduled to increase the vCenter memory allocation from **14 GB 
+to 21 GB**.
+
+---
+
+## Environment
+
+| Component          | Details                                |
+| ------------------ | -------------------------------------- |
+| Platform           | VMware vCenter Server Appliance (VCSA) |
+| Hypervisor         | VMware ESXi                            |
+| Current Memory     | 14 GB                                  |
+| Upgraded Memory    | 21 GB                                  |
+| ESXi Hosts Managed | 13                                     |
+| Virtual Machines   | 104                                    |
+| Backup Solution    | Veeam Replication                      |
+
+---
+
+## Problem Statement
+
+The monitoring system generated alerts indicating consistently high memory utilization on the vCenter Server.
+Although all services were functioning correctly, the allocated memory was insufficient for the current environment size, resulting in continuous 
+high memory usage.
+To ensure optimal performance and align with Broadcom's recommended sizing guidelines, a memory upgrade was planned.
+
+---
+
+## Change Planning
+
+Before performing the maintenance, the following prerequisites were completed:
+
+* Reviewed the approved Method of Procedure (MOP).
+* Confirmed the maintenance window with stakeholders.
+* Planned graceful shutdown of the vCenter Server Appliance.
+* Identified the ESXi host hosting the vCenter virtual machine.
+* Planned temporary suspension of Veeam replication jobs to avoid replication failures during the maintenance.
+
+---
+
+## Implementation
+
+### Step 1 – Stop Replication Jobs
+
+Paused all Veeam replication jobs associated with the vCenter environment to prevent replication errors during the maintenance activity.
+
+---
+
+### Step 2 – Gracefully Shut Down the vCenter Server
+
+Performed a graceful shutdown of the vCenter Server Appliance.
+
+Waited until the virtual machine was completely powered off.
+
+---
+
+### Step 3 – Modify Virtual Machine Hardware
+
+Logged in to the ESXi Host Client hosting the vCenter virtual machine.
+
+Edited the virtual machine settings and increased the memory allocation.
+
+Previous Configuration
+
+```text
+Memory : 14 GB
+```
+
+Updated Configuration
+
+```text
+Memory : 21 GB
+```
+
+Saved the updated virtual hardware configuration.
+
+---
+
+### Step 4 – Power On the vCenter Server
+
+Powered on the vCenter Server Appliance.
+
+Allowed sufficient time for the operating system and all vCenter services to initialize completely.
+
+Verified that all core services were running successfully.
+
+```bash
+service-control --status --all
+```
+
+---
+
+### Step 5 – Validate System Health
+
+After the appliance booted successfully, verified:
+
+* vCenter accessibility
+* Inventory availability
+* Host connectivity
+* Virtual machine status
+* vCenter service health
+* Memory utilization
+
+Confirmed that memory utilization had reduced significantly and the previously reported alert was automatically cleared.
+
+---
+
+### Step 6 – Resume Replication
+
+After successful validation, resumed all Veeam replication jobs.
+Verified that replication completed successfully without any failures.
+
+---
+
+## Validation
+
+Performed post-maintenance validation.
+
+Verified vCenter services.
+
+```bash
+service-control --status --all
+```
+
+Verified appliance health.
+
+```bash
+vmon-cli --status
+```
+
+Confirmed:
+
+* All vCenter services were running.
+* Hosts remained connected.
+* Virtual machines were healthy.
+* Memory utilization returned to acceptable levels.
+* High memory alert cleared automatically.
+* Replication jobs resumed successfully.
+
+---
+
+## Outcome
+
+* Successfully increased vCenter Server Appliance memory from **14 GB to 21 GB**.
+* Aligned the deployment with Broadcom sizing recommendations.
+* Eliminated continuous high-memory alerts.
+* Restored healthy memory utilization.
+* Completed the maintenance within the approved maintenance window.
+* Resumed Veeam replication successfully without impacting production workloads.
+
+---
+
+## Technologies Used
+
+* VMware vCenter Server Appliance (VCSA)
+* VMware ESXi
+* VMware Host Client
+* Broadcom vCenter Sizing Guidelines
+* Veeam Backup & Replication
+* Linux Administration
+* Change Management
+
+---
+
+## Key Learning
+
+Infrastructure sizing should be periodically reviewed as virtual environments grow. Although the vCenter Server was functioning correctly, 
+its memory allocation no longer matched the size of the managed infrastructure. Following Broadcom's recommended sizing guidelines and performing 
+a planned memory upgrade improved overall system health, eliminated recurring alerts, and ensured stable operation without service disruption.

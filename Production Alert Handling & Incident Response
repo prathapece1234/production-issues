@@ -332,6 +332,121 @@ When hardware degradation was confirmed:
 * Memory Analysis
 
 ---
+Alert 6: Critical. system.cpu.usage.utilization on the resource:app1 is 89.4%
+
+---
+
+
+A monitoring alert was generated indicating that CPU utilization on the Linux application server had exceeded the configured threshold.
+
+The alert showed CPU usage reaching **89.4%**, requiring immediate investigation to determine whether the issue was caused by a system resource 
+bottleneck, an application process, or an unexpected workload.
+
+---
+
+## Alert Details
+
+**Resource Type:** Linux
+
+**Alert Description**
+
+```text
+Critical. system.cpu.usage.utilization on the resource: app1 is 89.4%
+
+---
+
+## Investigation
+
+Verified the current CPU utilization.
+
+```bash
+top
+```
+
+Identified the processes consuming the highest CPU resources.
+
+```bash
+ps -eo pid,user,comm,%cpu --sort=-%cpu | head
+```
+
+Checked the overall system load.
+
+```bash
+uptime
+```
+
+Verified CPU usage over a period of time.
+
+```bash
+sar -u 1 10
+```
+
+The investigation showed that the increased CPU utilization was caused by the application process handling a high volume of incoming requests.
+
+No abnormal system processes or runaway services were identified.
+
+After the traffic reduced, CPU utilization returned to normal without requiring any service restart.
+
+---
+
+## Root Cause
+
+The high CPU utilization was directly related to increased application traffic during peak usage.
+
+The application process consumed additional CPU resources to handle the higher request volume.
+
+There was no evidence of:
+
+* CPU-intensive background jobs
+* Memory leaks
+* Zombie processes
+* Hardware issues
+* Operating system faults
+
+The CPU spike was workload-driven rather than an infrastructure issue.
+
+---
+
+## Resolution
+
+Verified that the application remained responsive throughout the event.
+
+Continued monitoring confirmed that CPU utilization gradually reduced as the incoming traffic normalized.
+
+Since the issue occurred only during periods of high application load, no immediate operating system changes were required.
+
+For sustained or recurring high CPU utilization, the Operations/Application team was advised to review:
+
+* Application workload
+* Request volume
+* Peak traffic patterns
+* Application performance
+* Capacity planning
+
+---
+
+## Validation
+
+Performed continuous monitoring after the alert.
+
+Verified:
+
+* CPU utilization returned below the alert threshold.
+* No application errors were observed.
+* No abnormal processes remained running.
+* Server responsiveness remained normal.
+
+---
+
+## Outcome
+
+* Confirmed the Linux server was operating normally.
+* Identified that the CPU spike was caused by legitimate application traffic.
+* Avoided unnecessary service restarts.
+* Recommended application-level analysis if the high CPU condition becomes continuous.
+
+---
+
 
 # Key Skills Demonstrated
 

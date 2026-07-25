@@ -512,6 +512,76 @@ The alert was generated because the monitoring threshold was exceeded during the
 
 ---
 
+# Alert 8 – High Inode Utilization on Linux Filesystem
+
+## Alert
+
+```text
+Critical
+
+Resource : movapp1
+IP Address : 10.72.0.100
+
+Alert : Disk Partition /app3 Inode Utilization
+
+Partition : /app3
+
+Total Inodes : 204200
+Used Inodes  : 198431
+Free Inodes  : 5769
+
+Inode Utilization : 98%
+```
+
+---
+
+## Investigation
+
+Verified inode utilization on the affected filesystem.
+
+```bash
+df -ih
+```
+
+Checked which directories were consuming the highest number of files.
+
+```bash
+du -sh /app3/*
+```
+
+Observed that the following directories occupied most of the inode usage.
+
+```text
+26G    jboss-5.1.0.GA
+276M   corpusfiles
+4.1G   SCRIPTS
+```
+
+Performed further analysis and identified that the **jboss-5.1.0.GA** directory contained a very large number of small files, resulting in high 
+inode consumption rather than disk space utilization.
+
+---
+
+## Root Cause
+
+The `/app3` filesystem reached **98% inode utilization** due to a large number of application-generated files under the **jboss-5.1.0.GA** directory.
+
+Although sufficient disk space was available, the filesystem was running out of available inodes because of the excessive file count.
+
+The files belonged to the application, so cleanup required application owner verification.
+
+---
+
+## Resolution
+
+- Verified inode utilization using `df -ih`.
+- Identified the directory consuming the highest number of files.
+- Confirmed that the inode usage was caused by application-generated files.
+- Shared the findings with the Operations/Application team.
+- Requested removal or archival of obsolete files after application validation.
+- Continued monitoring inode utilization after cleanup.
+
+---
 
 # Key Skills Demonstrated
 

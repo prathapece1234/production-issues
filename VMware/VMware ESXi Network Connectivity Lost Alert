@@ -1,0 +1,119 @@
+VMware ESXi Network Connectivity Lost Alert Due to Event Burst
+
+## Alert
+
+```text
+Critical
+
+Alert : Network Connectivity Lost
+
+Affected Resource : FW1
+Platform : VMware ESXi
+```
+
+---
+
+## Investigation
+
+The monitoring system generated a **Network Connectivity Lost** alert for the ESXi host where the FW1 virtual machine was hosted.
+
+Initially, the virtualization infrastructure was verified.
+
+Performed the following checks:
+
+* Verified ESXi host health.
+* Confirmed the host was connected to vCenter.
+* Verified datastore health.
+* Checked physical network adapters.
+* Verified management network connectivity.
+* Confirmed the FW1 virtual machine was powered on.
+
+No issues were identified at the VMware infrastructure level.
+
+The Network/Firewall team then verified the firewall appliance.
+
+Confirmed:
+
+* Firewall was accessible.
+* No firewall reboot had occurred.
+* Firewall uptime remained continuous.
+* Physical interfaces were operational.
+* Management connectivity was stable.
+
+This ruled out any firewall outage.
+
+Further investigation in the vCenter Events revealed multiple alarm status changes occurring within the same second.
+
+Observed events similar to:
+
+```text
+Alarm 'Network connectivity lost' changed from Green to Red
+
+Alarm 'Network connectivity lost' changed from Red to Green
+
+Bursting event 'vim.event.AlarmStatusChangedEvent'
+```
+
+At the same time, another event was observed:
+
+```text
+Host Certificate Expiration Is Imminent
+```
+
+The ESXi host certificate had expired, generating a large number of alarm status change events.
+
+---
+
+## Root Cause
+
+The **expired ESXi host certificate** triggered an event burst inside vCenter.
+
+During this event burst:
+
+* Both FW1 and FW2 generated Network Connectivity Lost alarms.
+* FW2 successfully received both the trigger (**Green → Red**) and recovery (**Red → Green**) events, allowing the alarm to clear automatically.
+* FW1 received the trigger event, but the recovery event was likely missed because of the high volume of simultaneous events.
+* As a result, the alert remained in a triggered state even though network connectivity had already recovered.
+
+There was **no actual network outage**, **no firewall reboot**, and **no ESXi host connectivity issue**.
+
+The issue was related to alarm processing within vCenter during the event burst.
+
+---
+
+## Resolution
+
+* Verified ESXi host health.
+* Verified physical network connectivity.
+* Verified management network stability.
+* Confirmed firewall services were operating normally.
+* Renewed the expired ESXi host certificate.
+* Manually cleared the stale Network Connectivity Lost alarm from vCenter after confirming the infrastructure was healthy.
+
+---
+
+## Validation
+
+Verified:
+
+* ESXi host connected successfully.
+* Host certificate renewed.
+* Management network operational.
+* Physical NICs healthy.
+* Firewall uptime unchanged.
+* No packet loss observed.
+* No new Network Connectivity Lost alarms generated after certificate renewal.
+* Alert cleared successfully.
+
+---
+
+## Skills Demonstrated
+
+* VMware ESXi Administration
+* vCenter Alarm Analysis
+* Certificate Management
+* VMware Event Troubleshooting
+* Network Infrastructure Validation
+* Production Incident Handling
+* Root Cause Analysis (RCA)
+* Cross-Team Coordination

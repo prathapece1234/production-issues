@@ -1,0 +1,171 @@
+# **Vector Installation and Configuration for Centralized Log Collection**
+
+## Overview
+
+As part of the centralized logging rollout for the SMSG application, **Vector** was deployed on the SMSG application server to collect application 
+logs and forward them to the centralized **Grafana Loki** server.
+
+The deployment included installing Vector, configuring log sources and sinks, validating connectivity to the Loki server, and enabling the Vector 
+service for automatic startup.
+
+---
+
+## Environment
+
+| Component        | Details                     |
+| ---------------- | --------------------------- |
+| Operating System | Red Hat Enterprise Linux    |
+| Log Collector    | Vector                      |
+| Log Storage      | Grafana Loki                |
+| Source Server    | SMSG Application Server     |
+| Destination      | Loki Server (10.230.200.56) |
+
+---
+
+## Requirements
+
+* Install Vector on SMSG application servers.
+* Configure Vector to monitor application log directories.
+* Forward logs securely to the centralized Loki server.
+* Ensure the service starts automatically after reboot.
+* Validate successful log ingestion into Loki.
+
+---
+
+## Implementation
+
+### Install Vector
+
+Configured the official Vector repository and installed the package.
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.vector.dev | bash
+
+yum install vector -y
+```
+
+Verified the installed version.
+
+```bash
+vector --version
+```
+
+---
+
+### Configure Vector
+
+Edited the Vector configuration file.
+
+```bash
+vi /etc/vector/vector.yaml
+```
+
+Configured the application log directory as the source.
+
+```yaml
+sources:
+  smsg_logs:
+    type: file
+    include:
+      - /loggers/**/*.log
+```
+
+Configured Loki as the destination sink.
+
+```yaml
+sinks:
+  loki:
+    type: loki
+    inputs:
+      - smsg_logs
+    endpoint: http://10.230.200.56:3100
+```
+
+---
+
+### Validate Configuration
+
+Validated the configuration syntax before starting the service.
+
+```bash
+vector validate /etc/vector/vector.yaml
+```
+
+---
+
+### Start Vector Service
+
+Enabled and started the Vector service.
+
+```bash
+systemctl enable vector
+systemctl start vector
+```
+
+Verified service status.
+
+```bash
+systemctl status vector
+```
+
+---
+
+### Monitor Vector Logs
+
+Verified that Vector started successfully and was forwarding logs.
+
+```bash
+journalctl -u vector -f
+```
+
+---
+
+### Validate Log Ingestion
+
+Generated sample application logs and confirmed that they were successfully ingested into Grafana Loki.
+
+Verified logs using Grafana Explore with LogQL queries.
+
+---
+
+## Validation
+
+Successfully verified:
+
+* Vector installed successfully.
+* Configuration validation completed without errors.
+* Vector service running normally.
+* Automatic startup enabled.
+* Successful connectivity to the Loki server.
+* Application logs forwarded successfully.
+* Logs visible in Grafana through the Loki datasource.
+
+---
+
+## Outcome
+
+* Successfully deployed Vector on the SMSG application server.
+* Enabled centralized log forwarding to Grafana Loki.
+* Validated end-to-end log ingestion.
+* Prepared the environment for production log monitoring and dashboard creation.
+
+---
+
+## Technologies Used
+
+* Vector
+* Grafana Loki
+* Grafana
+* Red Hat Enterprise Linux
+* Systemd
+* YAML
+* LogQL
+* Linux System Administration
+
+---
+
+## Key Learning
+
+Vector provides a lightweight and efficient log collection mechanism for centralized logging architectures. Validating the configuration before 
+enabling the service, confirming connectivity to the Loki endpoint, and verifying end-to-end log ingestion helps ensure a reliable logging pipeline 
+for production environments while minimizing operational overhead.

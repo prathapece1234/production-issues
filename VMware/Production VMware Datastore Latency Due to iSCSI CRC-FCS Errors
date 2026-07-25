@@ -1,0 +1,171 @@
+## Incident Summary
+
+A VMware ESXi host experienced intermittent storage latency affecting production virtual machines hosted on an HPE Alletra 6000 storage array. 
+Initial storage health checks confirmed that the storage array was operating normally. Investigation across the storage, virtualization, and network 
+layers identified increasing CRC/FCS errors on the iSCSI network path, resulting in packet loss, retransmissions, and elevated storage latency.
+
+---
+
+## Initial Symptoms
+
+* Intermittent datastore latency alerts.
+* Increased VM response times.
+* Higher storage I/O latency.
+* Growing Receive CRC error counters on ESXi iSCSI NICs.
+* CRC/FCS errors reported on storage interfaces.
+* No hardware faults reported by the storage array.
+
+---
+
+## Investigation
+
+### Initial Findings
+
+* Storage vendor confirmed the HPE Alletra 6000 array was healthy.
+* CRC errors were increasing on ESXi iSCSI interfaces (`vmnic4`, `vmnic5`, and `vmnic7`).
+* One iSCSI interface (`vmnic6`) showed no CRC errors.
+* Storage controllers also reported increasing received CRC errors.
+* Errors indicated corruption somewhere in the network path between the ESXi host and the storage array.
+
+### Network Analysis
+
+The Network team investigated the switch interfaces connected to both the ESXi host and the storage array.
+
+Findings:
+
+* Input packet errors observed on the server-connected switch ports.
+* Error counters were cleared for monitoring.
+* Recommendation provided to replace the network cable if the errors reappeared.
+
+### ESXi Validation
+
+Further validation identified that the installed Broadcom NIC driver and firmware versions were not aligned with the VMware Compatibility Guide 
+for the running ESXi version.
+
+Compatibility verification confirmed:
+
+* NIC firmware version mismatch.
+* Driver version mismatch.
+* Unsupported firmware and driver combination for the ESXi release.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+Multiple issues contributed to the storage latency:
+
+* CRC/FCS errors occurring on the iSCSI network path.
+* Unsupported Broadcom NIC firmware and driver combination.
+* Switch configuration incompatibility after the ESXi NIC update.
+
+These conditions resulted in corrupted Ethernet frames. The affected packets were discarded and retransmitted by higher-layer protocols, 
+increasing iSCSI response times and causing intermittent storage latency.
+
+---
+
+## Resolution Process
+
+### Step 1: Storage Validation
+
+Confirmed with the storage vendor that no storage hardware faults existed.
+
+### Step 2: Network Investigation
+
+Worked with the Network team to analyse switch interfaces connected to both the ESXi host and storage array.
+
+Input errors were identified on the server-facing switch ports.
+
+### Step 3: VMware Compatibility Verification
+
+Verified the installed Broadcom NIC firmware and driver versions against the VMware Compatibility Guide.
+
+Confirmed the installed versions were not supported for the running ESXi release.
+
+### Step 4: Firmware and Driver Upgrade
+
+* Downloaded the appropriate ESXi image containing the supported NIC driver.
+* Upgraded the Broadcom NIC firmware.
+* Updated the ESXi NIC driver to a supported version.
+
+### Step 5: Switch Configuration
+
+Although the firmware and driver were updated, CRC/FCS errors continued.
+
+Further investigation identified that additional switch-side configuration was required to align with the updated NIC behaviour.
+
+The Network team applied the required switch configuration changes.
+
+### Step 6: Validation
+
+After completing both the ESXi updates and switch configuration:
+
+* CRC/FCS errors stopped increasing.
+* No additional Receive CRC errors were observed.
+* iSCSI connectivity remained stable.
+* Datastore latency returned to normal.
+* VM performance improved.
+
+---
+
+## Final Outcome
+
+* Storage latency resolved.
+* CRC/FCS errors eliminated.
+* Stable iSCSI connectivity restored.
+* ESXi host operating with supported firmware and driver versions.
+* Production virtual machines returned to normal performance.
+
+---
+
+## Preventive Measures
+
+* Regularly verify NIC firmware and driver compatibility against the VMware Compatibility Guide.
+* Monitor CRC/FCS counters on ESXi hosts and network switches.
+* Validate switch configuration after NIC firmware upgrades.
+* Replace network cables if CRC/FCS errors reoccur.
+* Include firmware compatibility reviews during ESXi upgrade planning.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* Storage latency is not always caused by storage hardware; network integrity is equally important.
+* CRC/FCS errors often indicate physical layer or compatibility issues.
+* Unsupported NIC firmware and driver combinations can introduce network instability.
+* VMware firmware compatibility should always be validated before production upgrades.
+* Cross-team collaboration between Storage, Virtualization, Hardware, and Network teams significantly reduces troubleshooting time.
+
+---
+
+## Severity
+
+**Production Infrastructure – Critical VMware Storage Performance Issue**
+
+---
+
+## Skills Demonstrated
+
+* VMware ESXi Administration
+* HPE Alletra Storage Troubleshooting
+* Broadcom NIC Firmware Management
+* VMware Compatibility Validation
+* iSCSI Networking
+* Network Troubleshooting
+* Root Cause Analysis (RCA)
+* Cross-Team Collaboration
+* Production Incident Management
+* Infrastructure Performance Optimization
+
+---
+
+## Business Impact
+
+* Restored stable storage performance for production workloads.
+* Eliminated CRC/FCS errors affecting the iSCSI network.
+* Reduced storage latency and improved virtual machine responsiveness.
+* Prevented recurring network-related storage incidents through firmware standardization and switch configuration optimization.
+* Improved infrastructure stability across compute, storage, and networking layers.

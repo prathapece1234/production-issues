@@ -1,0 +1,348 @@
+## Overview
+
+Here i presenting some common alerts and troubleshooting methods
+
+Monitored production infrastructure using enterprise monitoring platforms and handled infrastructure alerts across Linux servers, VMware, storage, 
+PostgreSQL, and hardware.
+
+Each alert was investigated to determine the root cause, validated with system-level diagnostics, and resolved either through system administration 
+activities or by coordinating with database, application/operations teams.
+
+---
+
+# Alert 1 – High CPU Load
+
+## Alert
+
+```text
+Warning
+system.cpu.load.5min is 10.9
+
+Load 1 min  : 12.64
+Load 5 min  : 10.92
+Load 15 min : 6.80
+
+```
+
+---
+
+## Investigation
+
+Verified CPU utilization.
+
+```bash
+top/htop
+uptime
+```
+
+Checked processes consuming CPU.
+
+```bash
+ps -eo pid,ppid,user,%cpu,%mem,cmd --sort=-%cpu | head
+```
+
+Observed continuous PostgreSQL queries consuming CPU resources.
+Checked PostgreSQL activity.
+
+```sql
+SELECT pid,state,query
+FROM pg_stat_activity;
+```
+Or if any other application processes consuming cpu that checked with concern application teaam.
+
+Verified disk I/O to determine whether CPU load was caused by I/O wait.
+
+```bash
+iostat -xz 1 5
+vmstat 1 5
+```
+
+---
+
+## Root Cause
+
+Continuous PostgreSQL queries increased CPU utilization.
+In some cases, elevated **I/O wait** due to storage latency also contributed to higher system load.
+Or application process increase the load due to bugs or high traffic.
+
+---
+
+## Resolution
+
+* Verified running PostgreSQL queries.
+* Shared query details with the Database/Operations team.
+* Recommended query optimization.
+* Monitored CPU load until it returned to normal.
+* If high I/O wait was observed, storage performance was investigated before escalating.
+
+---
+
+## Skills Demonstrated
+
+* Linux Performance Tuning
+* PostgreSQL Monitoring
+* CPU Analysis
+* I/O Wait Analysis
+* Cross-Team Coordination
+
+---
+
+# Alert 2 – /var Filesystem Utilization
+
+## Alert
+
+```text
+Disk /var Warning
+
+Used : 83%
+Threshold : 80%
+```
+
+---
+
+## Investigation
+
+Verified filesystem usage.
+
+```bash
+df -h
+```
+
+Identified directories consuming space.
+
+```bash
+cd /var
+du -sh *
+du -sh /var/log/*
+```
+
+Located large files.
+
+```bash
+find /var/log -type f -size +500M
+```
+
+---
+
+## Root Cause
+
+Old application logs and archived log files consumed most of the filesystem.
+---
+
+## Resolution
+Compressed active log files.
+
+```bash
+gzip filename.log
+```
+
+Removed obsolete compressed logs based on the retention policy.
+
+Verified free space.
+
+```bash
+df -h
+```
+
+---
+
+## Skills Demonstrated
+
+* Linux Filesystem Management
+* Log Management
+* Capacity Planning
+
+---
+
+# Alert 3 – High Memory Utilization
+
+## Alert
+
+```text
+Memory Utilization : 89%
+Threshold : 88%
+```
+
+---
+
+## Investigation
+
+Verified memory utilization.
+
+```bash
+free -h
+top & press 'm'
+vmstat 1 5
+```
+
+Checked processes consuming memory.
+
+```bash
+ps -eo pid,user,%mem,cmd --sort=-%mem | head
+```
+
+Determined whether memory usage was due to:
+
+* Application memory leak
+* Memory exhaustion
+* Linux page cache
+
+---
+
+## Root Cause
+
+Depending on the workload, memory utilization was caused by one of the following:
+
+* Application memory leak
+* High application workload
+* Linux page cache consuming available memory
+
+---
+
+## Resolution
+
+If application memory leak was suspected:
+
+* Raised a case with the Application and Operations teams.
+* Shared process memory statistics.
+
+If cache usage was responsible and maintenance was approved:
+
+```bash
+sync
+echo 3 > /proc/sys/vm/drop_caches
+```
+
+Cache was cleared only during maintenance or off-peak hours.
+
+If memory was genuinely insufficient, planned a memory upgrade after analysing workload trends.
+
+---
+
+## Skills Demonstrated
+
+* Linux Memory Analysis
+* Memory Leak Investigation
+* Capacity Planning
+
+---
+
+# Alert 4 – Failed Storage Disk
+
+## Alert
+
+```text
+Critical
+Resource : DiskDrive-8
+State : Failed
+```
+
+---
+
+## Investigation
+
+Verified storage health.
+Reviewed RAID status.
+Confirmed failed disk through the storage management interface.
+Checked whether RAID rebuild was in progress.
+Monitored storage performance throughout the rebuild.
+
+---
+
+## Root Cause
+
+Physical disk failure within the RAID group.
+
+---
+
+## Resolution
+
+* Raised a hardware replacement request.
+* Scheduled replacement during the maintenance window.
+* Monitored RAID rebuild progress.
+* Verified storage health after replacement.
+
+---
+
+## Skills Demonstrated
+
+* Storage Administration
+* RAID Monitoring
+* Hardware Incident Management
+
+---
+
+# Alert 5 – Memory Degraded (Hardware) / Memory issue on HPE/DELL servers
+
+## Alert
+
+```text
+Memroy usage high alerts on servers
+ILO resilient memory condition Degraded
+```
+
+---
+
+## Investigation
+
+
+Verified host memory usage.
+Checked VMware memory statistics.
+
+Reviewed:
+
+* Memory Pressure
+* Ballooning
+* Swapping
+* Overhead Memory
+
+Verified DIMM health through the server management interface.
+
+---
+
+## Root Cause
+
+The was caused by a hardware memory fault. HPE iLO logs recorded an Uncorrectable ECC memory error and the affected module 
+(PROC 1 DIMM 12) was placed in Map Out Configuration, indicating the firmware disabled the faulty DIMM. The server automatically reset and 
+recovered using Automatic Power Recovery. No PSOD, kernel panic, or ESXi software fault was found in the vmkernel logs.
+
+---
+
+## Resolution
+
+When memory pressure was the issue:
+
+* Migrated virtual machines to another ESXi host using VMware vMotion.
+* Reduced resource contention.
+* Monitored host memory after migration.
+
+When hardware degradation was confirmed:
+
+* Prepared a Method of Procedure (MOP).
+* Scheduled DIMM replacement during the maintenance window.
+* Verified server health after replacement.
+
+---
+
+## Skills Demonstrated
+
+* VMware Administration
+* Capacity Management
+* Hardware Troubleshooting
+* Memory Analysis
+
+---
+
+# Key Skills Demonstrated
+
+* Production Incident Handling
+* Linux Performance Troubleshooting
+* CPU, Memory and Disk Analysis
+* VMware Administration
+* PostgreSQL Monitoring
+* Storage Administration
+* Capacity Planning
+* Root Cause Analysis (RCA)
+* Cross-Team Coordination
+* Infrastructure Monitoring
+* Enterprise Production Support

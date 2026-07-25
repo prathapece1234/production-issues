@@ -1,0 +1,247 @@
+# Provisioning Virtual Machines on Virtuozzo Private Cloud
+
+## Project Overview
+
+As part of a production infrastructure deployment, I provisioned multiple virtual machines on the **Virtuozzo Private Cloud** platform for 
+application, database, monitoring, backup, and reporting workloads.
+
+The deployment involved creating virtual machines, allocating compute resources, configuring networking, attaching storage volumes, installing 
+Red Hat Enterprise Linux, and preparing the servers for application deployment.
+
+---
+
+# Environment
+
+| Component        | Details                         |
+| ---------------- | ------------------------------- |
+| Platform         | Virtuozzo Private Cloud         |
+| Hypervisor       | Virtuozzo Hybrid Infrastructure |
+| Operating System | Red Hat Enterprise Linux        |
+| Network          | Production VLAN                 |
+| Storage          | Virtuozzo Storage (SSD)         |
+| Virtualization   | KVM                             |
+
+---
+
+# Server Roles
+
+Virtual machines were provisioned for the following workloads:
+
+* Database Servers
+* Application Servers
+* OCS Servers
+* DRA Servers
+* Data Servers
+* Reporting Servers
+* Monitoring Servers
+* Backup Servers
+
+Each server was provisioned with CPU, memory, storage, and network resources based on application requirements.
+
+---
+
+# Implementation
+
+## Step 1 – Create Virtual Machine
+
+Created virtual machines from the Virtuozzo management portal.
+
+Configured:
+
+* Virtual Machine Name
+* Number of vCPUs
+* Memory
+* Boot Disk
+* Network Interface
+* Operating System Image
+* Storage Policy
+
+Example configuration
+
+| Resource  | Value           |
+| --------- | --------------- |
+| CPU       | 4 vCPU          |
+| Memory    | 8 GB            |
+| Boot Disk | 50 GB           |
+| Network   | Production VLAN |
+| OS        | RHEL 9.6          |
+
+---
+
+## Step 2 – Attach Additional Storage
+
+Attached additional virtual disks based on application requirements.
+
+Example
+
+| Server Role        | Additional Storage |
+| ------------------ | ------------------ |
+| Database Server    | 500 GB             |
+| Application Server | 100 GB             |
+| Reporting Server   | 100 GB             |
+| Monitoring Server  | 50 GB              |
+
+After attaching the disks, verified from Linux.
+
+```bash
+lsblk
+fdisk -l
+```
+
+---
+
+## Step 3 – Install Red Hat Enterprise Linux
+
+Installed the operating system.
+
+Configured:
+
+* Hostname
+* Static IP Address
+* DNS Servers
+* Gateway
+* Time Zone
+* Root Password
+
+Verified connectivity.
+
+```bash
+ip addr
+hostnamectl
+ping <gateway>
+ping <dns-server>
+```
+
+---
+
+## Step 4 – Setup package repository and shared to client servers using sftp
+---
+Configured sftp server to share rhel system packages to client servers and in client servers configured sftp ip in /etc/yum.repos.d
+
+## Step 5 – Configure Storage
+
+Configured the attached storage using LVM.
+
+```bash
+pvcreate /dev/sdb
+
+vgcreate rhel /dev/sdb
+
+lvcreate -L 30G -n apps rhel
+
+lvcreate -L 40G -n loggers rhel
+```
+
+Created XFS filesystems.
+
+```bash
+mkfs.xfs /dev/rhel/apps
+mkfs.xfs /dev/rhel/loggers
+```
+
+Created mount points.
+
+```bash
+mkdir -p /apps
+mkdir -p /loggers
+```
+
+Mounted the filesystems.
+
+```bash
+mount /dev/rhel/apps /apps
+mount /dev/rhel/loggers /loggers
+```
+
+Configured persistent mounts.
+
+```bash
+echo "UUID=$(blkid -s UUID -o value /dev/rhel/apps) /apps xfs defaults 0 0" >> /etc/fstab
+echo "UUID=$(blkid -s UUID -o value /dev/rhel/loggers) /loggers xfs defaults 0 0" >> /etc/fstab
+
+mount -a
+```
+
+---
+
+## Step 6 – Create Application Users
+
+Created the required application users.
+
+* app1
+* app2
+* app3
+
+Automated user creation using Bash.
+
+```bash
+#!/bin/bash
+
+USERS=("app1 "app2" "app3)
+PASSWORD="Password@123"
+
+for user in "${USERS[@]}"
+do
+    id "$user" &>/dev/null || useradd -m "$user"
+
+    echo "$PASSWORD" | passwd --stdin "$user"
+
+    chage -d 0 "$user"
+    id $user
+
+done
+```
+
+Verified user accounts.
+
+## Step 8 – Validation
+
+Verified the virtual machine configuration.
+
+```bash
+hostnamectl
+ip addr
+lsblk
+df -h
+mount
+free -h
+swapon --show
+pvs
+vgs
+lvs
+cat /etc/fstab
+```
+
+Validated:
+
+* Virtual machine deployed successfully.
+* Operating system installed correctly.
+* Network connectivity verified.
+* Additional storage configured.
+* Persistent mounts configured using UUID.
+* Application users created.
+* Users required to change passwords during their first login.
+
+---
+
+# Outcome
+
+* Successfully provisioned multiple production virtual machines on Virtuozzo Private Cloud.
+* Configured compute, networking, storage, and operating system for each server.
+* Implemented persistent filesystem and swap configuration.
+* Automated Linux user provisioning with mandatory password changes on first login.
+* Delivered production-ready virtual machines for application deployment with a repeatable provisioning process.
+
+---
+
+# Technologies Used
+
+* Virtuozzo Private Cloud
+* KVM Virtualization
+* Red Hat Enterprise Linux
+* LVM
+* XFS Filesystem
+* Bash Shell Scripting
+* Linux User Administration
+* Network Configuration
+

@@ -1,0 +1,211 @@
+**Legacy RHEL 5/6 Server Migration to Red Hat Enterprise Linux 9.3**
+
+## Overview
+
+Several legacy Linux servers running **RHEL 5.x and RHEL 6.7** had reached end of support and could not be upgraded in place. Since Red Hat supports
+**in-place upgrades only from RHEL 7 onwards** using the Leapp utility, the only supported migration path was a **fresh installation** of 
+**Red Hat Enterprise Linux 9.3**.
+
+The migration involved backing up application data, rebuilding the virtual machines with RHEL 9.3, recreating the existing server configuration, 
+restoring the required application data, and validating the environment before handing it over to the application team.
+
+---
+
+## Environment
+
+| Component         | Details                                 |
+| ----------------- | --------------------------------------- |
+| Source OS         | RHEL 5.5, RHEL 5.6, RHEL 5.11, RHEL 6.7 |
+| Target OS         | Red Hat Enterprise Linux 9.3            |
+| Platform          | VMware Virtual Machines                 |
+| Migration Type    | Fresh Installation                      |
+| Number of Servers | 4                                       |
+
+---
+
+## Servers Migrated
+
+| Hostname      | Old OS    | New OS   |
+| ------------- | --------- | -------- |
+| tmco          | RHEL 5.11 | RHEL 9.3 |
+| TFCA.XIUS.COM | RHEL 5.5  | RHEL 9.3 |
+| masterdns     | RHEL 5.6  | RHEL 9.3 |
+| Krishna       | RHEL 6.7  | RHEL 9.3 |
+
+---
+
+## Problem Statement
+
+The existing servers were running unsupported versions of Red Hat Enterprise Linux.
+
+Since RHEL 5 and RHEL 6 do not support in-place upgrades to newer releases, the operating systems had to be rebuilt using a fresh installation.
+
+The challenge was to migrate the servers while preserving the existing server configuration and application environment.
+
+---
+
+## Pre-Migration Activities
+
+Before rebuilding the servers:
+
+* Verified application ownership.
+* Coordinated with the application team.
+* Confirmed complete application and configuration backups.
+* Documented the existing server configuration.
+* Scheduled the maintenance window.
+
+The following configurations were collected from the existing servers:
+
+* Hostname
+* IP Address
+* Network configuration
+* Mount points
+* Filesystem layout
+* Swap size
+* User and group information
+* NTP configuration
+* DNS configuration
+* Application directories
+
+---
+
+## Implementation
+
+### Backup
+
+Verified that application teams completed the required backups before the rebuild.
+
+---
+
+### Fresh Installation
+
+Performed a clean installation of **Red Hat Enterprise Linux 9.3** on all virtual machines.
+
+---
+
+### Server Configuration
+
+Recreated the existing server configuration to match the previous environment.
+
+Configured:
+
+* Hostname
+
+```bash
+hostnamectl set-hostname <hostname>
+```
+
+* Static IP Address
+* DNS configuration
+* Default Gateway
+* Network Interface
+* NTP synchronization
+* Timezone
+* Swap partition
+* Filesystem layout
+* Existing mount points
+* `/etc/fstab`
+* Required system users and groups
+* SSH configuration
+
+The mount points were recreated exactly as they existed on the legacy servers to ensure application compatibility.
+
+---
+
+### User Migration
+
+Recreated the required application users and groups.
+
+Verified ownership and permissions on application directories after restoring the backup.
+
+---
+
+### Application Data Restore
+
+Restored the application data from the backup.
+
+Verified:
+
+* Directory structure
+* File ownership
+* Permissions
+* Application configuration files
+
+---
+
+## Validation
+
+Performed post-migration validation.
+
+Verified:
+
+```bash
+hostnamectl
+```
+
+```bash
+ip addr
+```
+
+```bash
+df -h
+```
+
+```bash
+swapon --show
+```
+
+```bash
+timedatectl
+```
+
+```bash
+chronyc sources
+```
+
+Confirmed:
+
+* RHEL 9.3 installed successfully.
+* Hostname matched the previous server.
+* IP configuration was correct.
+* Mount points matched the legacy environment.
+* Swap was configured correctly.
+* NTP synchronization was operational.
+* Application users and groups were recreated.
+* Application data restored successfully.
+* Services started without issues.
+
+---
+
+## Outcome
+
+* Successfully migrated four legacy RHEL 5/6 servers to **RHEL 9.3**.
+* Preserved the existing server configuration and filesystem layout.
+* Recreated all required mount points, users, and network settings.
+* Restored application data successfully.
+* Eliminated unsupported operating systems from the environment.
+* Completed the migration with successful validation and application handover.
+
+---
+
+## Technologies Used
+
+* Red Hat Enterprise Linux 9.3
+* VMware
+* Linux System Administration
+* Filesystem Management
+* LVM
+* NTP (Chrony)
+* SSH
+* Linux Networking
+* Backup & Restore
+* Change Management
+
+---
+
+## Key Learning
+
+Legacy operating systems such as **RHEL 5** and **RHEL 6** cannot be upgraded directly to modern Red Hat releases because in-place upgrade support 
+begins with RHEL 7. A well-planned migration using a fresh installation, combined with comprehensive backups and recreation of the existing server 
+configuration—including hostnames, IP addresses, mount points, users, swap, and NTP settings—ensures a smooth transition to a supported operating 
+system with minimal impact on application functionality.

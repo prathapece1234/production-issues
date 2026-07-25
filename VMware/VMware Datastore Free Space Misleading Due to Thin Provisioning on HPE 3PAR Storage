@@ -1,0 +1,153 @@
+## Incident Summary
+
+During virtual machine provisioning, the VMware ESXi datastore reported approximately **1.83 TiB** of available free space. However, verification on 
+the HPE 3PAR storage array revealed that the underlying storage pool (CPG) had only **83 GiB** of actual physical free capacity remaining.
+
+This discrepancy was caused by thin provisioning, where VMware reports logical datastore capacity while the storage array allocates space from a 
+shared storage pool.
+
+Without validating the backend storage capacity, provisioning additional virtual disks could have resulted in storage exhaustion and production 
+outages.
+
+---
+
+## Initial Symptoms
+
+* VMware datastore reported approximately **1.83 TiB** free space.
+* Backend storage utilization appeared significantly higher than VMware reported.
+* Risk of storage over-allocation due to thin provisioning.
+
+---
+
+## Investigation
+
+### Initial Findings
+
+Verified datastore capacity from VMware ESXi.
+
+Observed:
+
+* Datastore Capacity: **2.87 TiB**
+* Datastore Free Space: **1.83 TiB**
+
+However, verification on the HPE 3PAR storage array showed:
+
+* SSD RAID5 Pool Total: **~1.13 TiB**
+* Actual Free Space: **~83 GiB**
+* Storage Utilization: **93%**
+
+The Common Provisioning Group (CPG) reported:
+
+* Total Capacity: **14.8 TiB**
+* Available Capacity: **1.39 TiB**
+* Utilization: **91%**
+
+This indicated that VMware logical capacity did not accurately represent the remaining physical storage available for allocation.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+The VMware datastore was thin-provisioned on HPE 3PAR storage.
+
+VMware displayed the logical free capacity of the datastore, while the storage array allocated blocks from a shared CPG that had very limited 
+remaining physical capacity.
+
+### Technical Cause
+
+* Thin Provisioned VMFS datastore.
+* Backend storage allocated from shared CPG.
+* VMware logical capacity differed from actual physical storage availability.
+* Storage pool approaching full utilization.
+
+---
+
+## Resolution Process
+
+### Step 1: Verify VMware Datastore
+
+Checked datastore capacity and free space through the ESXi/vCenter interface.
+
+### Step 2: Validate Storage Array
+
+Reviewed HPE 3PAR storage utilization and CPG capacity.
+
+Verified:
+
+* Physical free capacity
+* RAID pool utilization
+* CPG allocation
+
+### Step 3: Capacity Assessment
+
+Compared VMware logical datastore capacity against actual storage pool capacity.
+
+Determined that allocating additional virtual disks based solely on VMware free space would introduce a risk of storage exhaustion.
+
+### Step 4: Recommendation
+
+Recommended utilizing storage pools with sufficient available capacity instead of relying only on VMware datastore statistics.
+
+---
+
+## Final Outcome
+
+* Prevented potential storage overallocation.
+* Identified the discrepancy between logical and physical storage capacity.
+* Improved storage capacity planning.
+* Increased awareness of thin provisioning behaviour.
+* Established storage validation before VM provisioning.
+
+---
+
+## Preventive Measures
+
+* Always verify backend storage capacity before provisioning new virtual disks.
+* Monitor CPG utilization regularly.
+* Configure storage utilization alerts.
+* Review thin provisioning ratios periodically.
+* Coordinate capacity planning between VMware and Storage teams.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* VMware datastore free space does not always represent actual physical storage availability.
+* Thin provisioning can make a datastore appear to have significantly more free space than the storage array can physically provide.
+* Backend storage utilization should always be validated before allocating additional virtual disks.
+* Enterprise storage arrays allocate capacity from shared storage pools (CPGs), making storage-level monitoring essential.
+* Effective capacity planning requires visibility into both virtualization and storage layers.
+
+---
+
+## Severity
+
+**Production Infrastructure – Storage Capacity Planning**
+
+---
+
+## Skills Demonstrated
+
+* VMware vSphere Administration
+* HPE 3PAR Storage Administration
+* Storage Capacity Planning
+* Thin Provisioning Analysis
+* VMFS Datastore Management
+* Enterprise Storage Monitoring
+* Root Cause Analysis (RCA)
+* Infrastructure Capacity Management
+* Production Storage Support
+
+---
+
+## Business Impact
+
+* Prevented storage overallocation and potential production outages.
+* Improved storage provisioning decisions by validating backend capacity.
+* Reduced the risk of virtual machine provisioning failures.
+* Enhanced collaboration between VMware and Storage administration teams.
+* Established a best practice of verifying physical storage availability before allocating new virtual disks.

@@ -1,0 +1,129 @@
+
+## Overview
+
+A production user reported that the RHEL server was responding very slowly during SSH login. The delay occurred before the login prompt appeared, 
+making it difficult for administrators to access the server. Once logged in, the server operated normally without any performance degradation.
+
+The issue was investigated by checking system performance, SSH configuration, and authentication settings. It was identified that unnecessary 
+GSSAPI and Kerberos authentication were causing the login delay.
+
+---
+
+## User Report
+
+The QC server is currently responding very slowly, starting from the login stage itself. Could you please check the server performance and 
+let us know if any issue is identified?
+
+---
+
+## Investigation
+
+First, overall server performance was verified to ensure the issue was not related to resource utilization.
+
+Checked CPU, memory, and system load.
+
+```bash
+top
+uptime
+free -h
+vmstat 1 5
+```
+
+Verified disk utilization.
+
+```bash
+df -h
+```
+
+The server resources were within normal limits, and after login the server responded normally. This confirmed that the issue was limited to the 
+SSH authentication phase.
+
+Next, the SSH daemon configuration was reviewed.
+
+```bash
+grep -Ei "GSSAPIAuthentication|KerberosAuthentication" /etc/ssh/sshd_config
+```
+
+The configuration showed:
+
+```text
+GSSAPIAuthentication yes
+KerberosAuthentication yes
+```
+
+Since Kerberos authentication was not being used in the environment, SSH attempted GSSAPI and Kerberos authentication before falling back to 
+password authentication, introducing a noticeable delay during login.
+
+---
+
+## Root Cause
+
+The SSH daemon was configured to use **GSSAPI** and **Kerberos Authentication**, even though these authentication methods were not required.
+During each SSH connection, the server attempted these authentication mechanisms first, causing delays before presenting the login prompt.
+
+---
+
+## Resolution
+
+Disabled GSSAPI and Kerberos authentication in the SSH configuration.
+
+Updated `/etc/ssh/sshd_config`:
+
+```text
+GSSAPIAuthentication no
+KerberosAuthentication no
+```
+
+Restarted the SSH service.
+
+```bash
+systemctl restart sshd
+```
+
+---
+
+## Validation
+
+Verified the updated SSH configuration.
+
+```bash
+grep -Ei "GSSAPIAuthentication|KerberosAuthentication" /etc/ssh/sshd_config
+```
+
+Verified the SSH service.
+
+```bash
+systemctl status sshd
+```
+
+Tested SSH login from a remote client.
+
+The login prompt appeared immediately without any delay, and the server continued to function normally after authentication.
+
+---
+
+## Outcome
+
+* Resolved slow SSH login issue on the RHEL server.
+* Improved administrator login experience by eliminating unnecessary authentication delays.
+* Confirmed that server performance was not affected after login.
+* Optimized SSH configuration by disabling unused authentication mechanisms.
+
+---
+
+## Technologies Used
+
+* Red Hat Enterprise Linux
+* OpenSSH
+* SSHD Configuration
+* GSSAPI Authentication
+* Kerberos Authentication
+* Linux System Administration
+
+---
+
+## Key Learning
+
+When troubleshooting slow SSH logins, always verify system resource utilization before assuming a performance issue. If the server performs 
+normally after login, review the SSH authentication configuration. Disabling unused authentication methods such as GSSAPI and Kerberos can 
+significantly reduce SSH login time in environments where these services are not required.

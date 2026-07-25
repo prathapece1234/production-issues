@@ -1,0 +1,253 @@
+# **Recovery of Ubuntu Server After Accidental Deletion of Critical System Files**
+
+## Overview
+
+A production issue was reported where administrators were unable to log in to the Ubuntu server. Although the server remained reachable over the 
+network, the operating system failed to function correctly due to accidental execution of critical administrative commands.
+
+Investigation revealed that commands such as **`chroot`**, **`mount --bind`**, and **`rm`** had been executed, resulting in the deletion of 
+essential operating system files, including binaries under **`/sbin`**. As a result, the server could not boot correctly and several core services 
+failed to initialize.
+
+A recovery procedure was performed using Ubuntu Recovery Mode to restore the missing operating system files, recover networking components, and 
+return the server to normal operation.
+
+---
+
+## Environment
+
+| Component        | Details                                  |
+| ---------------- | ---------------------------------------- |
+| Operating System | Ubuntu Linux                             |
+| Issue            | Operating System Corruption              |
+| Recovery Method  | Ubuntu Recovery Mode                     |
+| Impact           | SSH Login Failure / Missing System Files |
+
+---
+
+## Problem Statement
+
+Users reported that they were unable to access the server.
+
+Initial verification confirmed:
+
+* Server was reachable over the network.
+* SSH login was unavailable.
+* Critical operating system binaries were missing.
+* System failed to initialize normally.
+
+Further investigation identified that critical administrative commands had unintentionally removed essential operating system files.
+
+---
+
+## Investigation
+
+Verified the server was reachable.
+
+```bash
+ping <server_ip>
+```
+
+Reviewed shell history and system logs.
+
+Identified execution of commands such as:
+
+```bash
+chroot
+mount --bind
+rm
+```
+
+Verified that important directories including **`/sbin`** and required shared libraries were missing, causing the operating system to become 
+partially corrupted.
+
+---
+
+## Root Cause
+
+A user accidentally executed destructive administrative commands while working in a recovery (`chroot`) environment.
+
+Execution of the `rm` command removed essential operating system files, including binaries under `/sbin`.
+
+This resulted in:
+
+* Failure of system utilities.
+* SSH login becoming unavailable.
+* Missing networking components after recovery.
+* Partial operating system corruption.
+
+---
+
+## Implementation
+
+### Boot into Ubuntu Recovery Mode
+
+Booted the server into Ubuntu Recovery Mode and mounted the root filesystem.
+
+Mounted the required virtual filesystems.
+
+# Identify the root partition
+lsblk
+fdisk -l
+
+# Example: root partition is /dev/sda2
+mount /dev/sda2 /mnt
+
+if it is lvm
+
+vgchange -ay
+mount /dev/mapper/ubuntu--vg-ubuntu--lv /mnt
+
+# If a separate boot partition exists
+mount /dev/sda1 /mnt/boot
+
+# If using UEFI
+mount /dev/sda1 /mnt/boot/efi
+
+```bash
+mount --bind /dev /mnt/dev
+mount --bind /proc /mnt/proc
+mount --bind /sys /mnt/sys
+```
+
+Entered the installed operating system.
+
+```bash
+chroot /mnt
+```
+
+---
+
+### Restore Missing System Files
+
+Since Internet connectivity was unavailable in Recovery Mode, installing packages using `apt` was not possible.
+Verified that critical binaries under `/sbin` and required shared libraries were missing.
+Copied the missing binaries and libraries from the recovery environment to the installed operating system to restore the minimum components 
+required for booting successfully.
+
+---
+
+### Boot the Operating System
+
+Exited the recovery environment and rebooted the server.
+
+The server booted successfully and SSH access was restored.
+
+---
+
+### Restore Missing Packages
+
+After the server booted and Internet connectivity became available, verified the operating system packages.
+
+Updated package metadata.
+
+```bash
+apt update
+```
+
+Repaired broken packages.
+
+```bash
+apt --fix-broken install
+```
+
+Reinstalled any missing operating system packages.
+
+```bash
+apt install --reinstall <required-package>
+```
+
+---
+
+### Restore veth Networking Support
+
+After booting, it was observed that the **veth (Virtual Ethernet)** module required by container networking was missing.
+
+Verified the kernel module.
+
+```bash
+lsmod | grep veth
+```
+
+Checked module availability.
+
+```bash
+modinfo veth
+```
+
+Loaded the module.
+
+```bash
+modprobe veth
+```
+
+If required, reinstalled the Linux kernel modules package.
+
+```bash
+apt install --reinstall linux-modules-extra-$(uname -r)
+```
+
+Verified the module was loaded successfully.
+
+```bash
+lsmod | grep veth
+```
+
+---
+
+### Final Reboot
+
+Performed a final reboot after completing the recovery.
+
+```bash
+reboot
+```
+
+---
+
+## Validation
+
+Verified:
+
+* Server booted successfully.
+* SSH login was restored.
+* `/sbin` binaries were available.
+* Missing shared libraries were restored.
+* Required operating system packages were reinstalled.
+* `veth` kernel module loaded successfully.
+* Network interfaces initialized correctly.
+* Applications and services started successfully.
+
+---
+
+## Outcome
+
+* Successfully recovered the Ubuntu server from operating system corruption.
+* Restored critical operating system binaries without rebuilding the server.
+* Recovered missing shared libraries.
+* Reinstalled missing operating system packages after boot.
+* Restored virtual Ethernet (`veth`) support.
+* Returned the server to normal production operation after validation.
+
+---
+
+## Technologies Used
+
+* Ubuntu Linux
+* Ubuntu Recovery Mode
+* `chroot`
+* `mount --bind`
+* APT Package Manager
+* Linux Kernel Modules
+* Linux Networking
+* SSH
+* Linux System Administration
+
+---
+
+## Key Learning
+
+Recovery Mode is an effective method for repairing Linux systems when critical operating system files have been accidentally deleted. 
+When Internet connectivity is unavailable in the recovery environment, manually restoring essential binaries and libraries can provide a minimal 
+bootable system. Once normal boot is restored, missing packages and kernel modules can be reinstalled, followed by validation of networking and 
+application services to ensure the server returns to a stable production state.

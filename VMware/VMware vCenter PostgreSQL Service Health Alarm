@@ -1,0 +1,129 @@
+## Incident Summary
+
+A production alert was generated from the VMware vCenter Server Appliance (VCSA) indicating that the embedded PostgreSQL service health had 
+changed from **Healthy** to **Warning**.
+
+Since PostgreSQL is the backend database for vCenter, immediate investigation was initiated to determine whether the issue was caused by a database 
+failure, service interruption, or an underlying operating system resource problem.
+
+---
+
+## Alert Details
+
+| Parameter    | Value                                                                   |
+| ------------ | ----------------------------------------------------------------------- |
+| Alarm Name   | PostgreSQL Service Health Alarm                                         |
+| Description  | Default alarm that monitors the health status of the PostgreSQL Service |
+| Entity Type  | Folder                                                                  |
+| Entity Name  | Datacenters                                                             |
+| Alarm UUID   | alarm-75.group-d1                                                       |
+| vCenter Host | 10.x.x.x                                                                |
+| Severity     | Warning                                                                 |
+
+Alarm Expression
+
+```text
+HealthStatusChangedEvent
+
+Green → Yellow → Red
+```
+
+---
+
+## Initial Symptoms
+
+* VMware vCenter generated a **PostgreSQL Service Health Alarm**.
+* The PostgreSQL service was running but its health status changed to **Warning**.
+* No application outage was reported, but the alert required immediate investigation due to the critical nature of the vCenter database.
+
+---
+
+## Investigation
+
+Logged in to the VMware vCenter Server Appliance (VCSA) through SSH to verify the operating system and service health.
+
+Checked the filesystem utilization.
+
+```bash
+df -h
+```
+
+Observed that multiple filesystem mount points had reached **100% utilization**, leaving no free space for PostgreSQL to write logs and temporary files.
+
+Further analyzed disk usage.
+
+```bash
+du -sh /storage/*
+find /storage/log -type f -size +100M
+```
+
+The investigation confirmed that storage exhaustion was the reason for the degraded PostgreSQL health status.
+
+---
+
+## Root Cause
+
+The PostgreSQL database service was operational and had not stopped.
+
+However, one or more VCSA filesystem mount points were completely full. As PostgreSQL requires free disk space for transaction logs, 
+temporary files, and database operations, the service health automatically changed to **Warning**.
+
+---
+
+## Resolution
+
+Identified and compresssed using gzip and removed old log files and obsolete data from the affected filesystem.
+Verified available disk space after cleanup.
+
+```bash
+df -h
+```
+
+Once sufficient free space became available, VMware automatically reassessed the PostgreSQL service health.
+The PostgreSQL service status remained **Started**, and its health changed from **Warning** to **Healthy** without requiring a service restart.
+---
+
+## Validation
+
+Verified the PostgreSQL service from the vCenter Services page.
+
+* Service Status: **Started**
+* Health Status: **Healthy**
+
+Confirmed:
+
+* Filesystem utilization returned to normal.
+* PostgreSQL Service Health Alarm cleared automatically.
+* No additional alarms were reported.
+* vCenter services continued to function normally.
+
+---
+
+## Business Impact
+
+* Prevented a potential degradation of vCenter management services.
+* Restored PostgreSQL service health without restarting vCenter services.
+* Minimized operational risk by resolving the issue before it affected infrastructure management.
+* Improved proactive monitoring of VCSA filesystem utilization to prevent similar incidents.
+
+---
+
+## Key Learning
+
+Not every PostgreSQL Service Health Alarm indicates a database failure. In this incident, the PostgreSQL service itself remained operational, 
+but insufficient filesystem space caused the health status to degrade. Verifying operating system resources with `df -h` helped identify the root 
+cause quickly and restore the service to a healthy state without unnecessary service restarts.
+
+---
+
+## Skills Demonstrated
+
+* VMware vCenter Server Appliance (VCSA) Administration
+* Incident Handling
+* Linux Filesystem Troubleshooting
+* Disk Space Analysis
+* VMware Alarm Investigation
+* Production Support
+* Root Cause Analysis (RCA)
+* Service Health Validation
+* Linux System Administration

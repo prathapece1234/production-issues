@@ -1,0 +1,137 @@
+## Incident Summary
+
+A VPN user reported that internal Kubernetes applications under the `*.dev.k8s.xius.com` domain were still resolving to a public IP address even 
+after connecting to the corporate VPN. Initial investigation confirmed that the VPN was assigning the correct internal DNS server, and DNS queries 
+against the configured DNS server returned the correct internal IP. The issue was ultimately traced to stale DNS cache entries on the client 
+workstation.
+
+---
+
+## Initial Symptoms
+
+* Internal application resolved to a public IP address.
+* User connected successfully to the corporate VPN.
+* VPN assigned the correct internal DNS server.
+* Internal application inaccessible despite correct VPN connection.
+* DNS resolution appeared inconsistent between different diagnostic tools.
+
+---
+
+## Investigation
+
+### Initial Findings
+
+* Verified the VPN connection was established successfully.
+* Confirmed the workstation received the correct internal DNS server.
+* Executed `Resolve-DnsName` and confirmed the DNS server returned the correct internal IP address.
+* Compared the DNS response with the application's behaviour.
+* Checked the local Windows DNS cache.
+* Identified that the client was using a previously cached public DNS record instead of querying the internal DNS server.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+The Windows DNS Client cache contained an outdated public DNS record for the application domain. Although the VPN connection and DNS configuration 
+were correct, Windows continued using the cached entry instead of performing a new DNS lookup.
+
+### Technical Cause
+
+* VPN configuration was correct.
+* Internal DNS server was functioning normally.
+* `Resolve-DnsName` returned the expected internal IP.
+* Windows DNS cache contained stale public DNS records.
+* Cached entries prevented fresh DNS resolution.
+
+---
+
+## Resolution Process
+
+### Step 1: Verify VPN Configuration
+
+Confirmed the workstation received the correct DNS server through the VPN.
+
+### Step 2: Validate DNS Resolution
+
+Verified that the internal DNS server correctly resolved the application domain.
+
+### Step 3: Inspect Local DNS Cache
+
+Reviewed the Windows DNS client cache and identified stale records for the affected domain.
+
+```powershell
+ipconfig /displaydns
+```
+
+### Step 4: Clear DNS Cache
+
+Cleared the local DNS cache.
+
+```powershell
+ipconfig /flushdns
+```
+
+### Step 5: Validation
+
+Performed a fresh DNS lookup and confirmed that the application domain resolved to the correct internal IP address.
+
+Verified application access was restored successfully.
+
+---
+
+## Final Outcome
+
+* Stale DNS cache removed successfully.
+* Internal DNS resolution restored.
+* Kubernetes applications became accessible over VPN.
+* No infrastructure or DNS server changes were required.
+* Issue resolved entirely on the client workstation.
+
+---
+
+## Preventive Measures
+
+* Verify local DNS cache before investigating DNS infrastructure.
+* Flush DNS cache after VPN DNS configuration changes.
+* Educate users on clearing DNS cache when stale records are suspected.
+* Include client-side cache verification in DNS troubleshooting procedures.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* Correct VPN and DNS server configuration does not guarantee correct name resolution if stale client-side DNS cache exists.
+* Always compare live DNS queries with cached DNS entries during troubleshooting.
+* Client-side cache validation can prevent unnecessary infrastructure changes.
+* `ipconfig /flushdns` is an effective first step when DNS behaviour is inconsistent.
+
+---
+
+## Severity
+
+**Production Support – Client DNS Cache Resolution Issue**
+
+---
+
+## Skills Demonstrated
+
+* Windows DNS Troubleshooting
+* VPN Connectivity Validation
+* DNS Cache Analysis
+* Root Cause Analysis (RCA)
+* Client-Side Network Troubleshooting
+* Production Support
+* Infrastructure Diagnostics
+
+---
+
+## Business Impact
+
+* Restored access to internal applications without infrastructure changes.
+* Reduced troubleshooting time by identifying a client-side issue.
+* Avoided unnecessary changes to VPN and DNS infrastructure.
+* Improved user productivity by quickly resolving the DNS resolution problem.

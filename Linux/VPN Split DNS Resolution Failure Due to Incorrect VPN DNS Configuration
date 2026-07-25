@@ -1,0 +1,140 @@
+## Incident Summary
+
+Users connected through the corporate VPN were unable to access internal Kubernetes applications hosted under the `*.dev.k8s.xius.com` domain. 
+Although the internal DNS infrastructure was functioning correctly, DNS queries from VPN-connected clients were resolving to public IP addresses 
+instead of internal Kubernetes services. The issue was traced to an incorrect DNS server being assigned by the VPN configuration.
+
+---
+
+## Initial Symptoms
+
+* Internal Kubernetes applications inaccessible over VPN
+* `*.dev.k8s.xius.com` resolved to public IP addresses
+* DNS resolution differed between VPN and office LAN
+* Internal services accessible only from the corporate network
+* Remote users unable to access development applications
+* Split DNS functionality not working as expected
+
+---
+
+## Investigation
+
+### Initial Findings
+
+* Verified internal BIND and CoreDNS servers were operational.
+* Confirmed internal DNS zones resolved correctly from the corporate LAN.
+* Checked the DNS server assigned to VPN clients.
+* Observed that VPN clients received **192.168.100.101** as the DNS server.
+* Compared DNS resolution using VPN and LAN connections.
+* Verified that public DNS returned the same IP address seen by VPN clients.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+The VPN configuration assigned an incorrect DNS server (`192.168.100.101`) to remote clients. This DNS server did not contain the required internal 
+DNS configuration for resolving Kubernetes subdomains.
+
+As a result, DNS queries for internal domains were resolved using public DNS records instead of the internal DNS infrastructure.
+
+### Technical Cause
+
+* VPN pushed an incorrect DNS server to clients.
+* Internal Kubernetes DNS zones were unavailable through the assigned DNS server.
+* Split DNS configuration was incomplete for VPN users.
+* Internal domains resolved using public DNS infrastructure.
+
+---
+
+## Resolution Process
+
+### Step 1: DNS Verification
+
+Validated that internal DNS servers correctly resolved Kubernetes application domains.
+
+### Step 2: Client DNS Analysis
+
+Verified the DNS server assigned by the VPN using Windows DNS client configuration.
+
+### Step 3: Network Validation
+
+Compared DNS resolution between VPN and corporate LAN connections and confirmed that only VPN users experienced the issue.
+
+### Step 4: Cross-Team Collaboration
+
+Shared the investigation findings with the Network team and recommended updating the VPN configuration to distribute the correct internal DNS 
+server (`192.168.149.224`) instead of the existing DNS server.
+
+### Step 5: Validation
+
+After the VPN DNS configuration was updated:
+
+* Reconnected to the VPN.
+* Verified the client received the new DNS server.
+* Confirmed successful resolution of `*.dev.k8s.xius.com`.
+* Validated access to internal Kubernetes applications.
+
+---
+
+## Final Outcome
+
+* Internal DNS resolution restored for VPN users.
+* Split DNS functionality working correctly.
+* Remote users successfully accessed Kubernetes applications.
+* No modifications required on the BIND or CoreDNS servers.
+* Production services remained unaffected during the resolution.
+
+---
+
+## Preventive Measures
+
+* Validate VPN-assigned DNS servers after configuration changes.
+* Periodically verify Split DNS functionality.
+* Include VPN DNS validation in infrastructure health checks.
+* Document approved internal DNS servers for VPN environments.
+* Establish monitoring for VPN DNS configuration changes.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* DNS resolution issues are not always caused by DNS servers; client DNS assignment should also be verified.
+* VPN configuration plays a critical role in Split DNS environments.
+* Comparing DNS behaviour between VPN and corporate LAN significantly accelerates troubleshooting.
+* Cross-team collaboration between Linux and Network teams helps identify infrastructure issues more efficiently.
+
+---
+
+## Severity
+
+**Production Infrastructure – VPN Split DNS Resolution Issue**
+
+---
+
+## Skills Demonstrated
+
+* Linux System Administration
+* BIND DNS Administration
+* CoreDNS Troubleshooting
+* Windows DNS Diagnostics
+* VPN Troubleshooting
+* Split DNS Architecture
+* Root Cause Analysis
+* Cross-Team Collaboration
+* Production Incident Management
+* Network Troubleshooting
+
+---
+
+## Business Impact
+
+* Restored secure remote access to internal Kubernetes applications.
+* Eliminated incorrect public DNS resolution for internal domains.
+* Improved reliability of VPN-based application access.
+* Reduced downtime for remote development teams.
+* Strengthened VPN and DNS infrastructure stability.
+* Enhanced collaboration between Infrastructure and Network teams during incident resolution.

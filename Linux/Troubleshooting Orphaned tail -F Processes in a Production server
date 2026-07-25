@@ -1,0 +1,177 @@
+Incident: Orphaned `tail -F` Processes Causing Process Accumulation on Application Server
+
+## Incident Summary
+
+The application support team reported that multiple `tail -F` and shell (`sh`) processes were continuously running on the application server, 
+even though the associated log monitoring functionality had already been disabled.
+
+An investigation was initiated to determine whether the processes were active application tasks, zombie processes, or orphaned background processes 
+left behind by a monitoring script.
+
+---
+
+# User Report
+
+While checking the application server, we observed many **`tail -F`** and **`sh`** processes running on the server. Some of them appear to be 
+related to scripts and log monitoring activities which are currently not enabled. 
+
+---
+
+# Severity
+
+**Medium**
+
+Although there was no application outage, unnecessary background processes were continuously accumulating, increasing the process count and making 
+troubleshooting more difficult.
+
+---
+
+# Initial Investigation
+
+Verified the running shell processes.
+
+```bash
+ps -ef | grep -i sh
+```
+
+Observed multiple instances of the same monitoring script.
+Example:
+
+```text
+sh HLR_AGENT_ERROR.sh
+sh HLR_AGENT_ERROR.sh
+sh HLR_AGENT_ERROR.sh
+...
+```
+
+Next, verified the log monitoring processes.
+
+```bash
+ps -ef | grep "tail -F"
+```
+Observed a large number of `tail -F` processes monitoring historical application log files.
+
+Example:
+
+```text
+tail -F /apps/tomcat-9.0.75/HLR_AGENT/log/HLRApplication-2026-03-04....log
+tail -F /apps/tomcat-9.0.75/HLR_AGENT/log/HLRApplication-2026-03-05....log
+tail -F /apps/tomcat-9.0.75/HLR_AGENT/log/HLRApplication-2026-03-06....log
+```
+
+---
+
+# Investigation
+
+Reviewed the monitoring script (`HLR_AGENT_ERROR.sh`) responsible for log monitoring.
+Verified whether the script was still scheduled or actively executing.
+The investigation confirmed that the script itself was **no longer running**.
+However, previous executions of the script had started multiple background `tail -F` processes.
+The script launched `tail -F` to monitor application logs but did not terminate the background process after execution.
+As the script was executed repeatedly over time, every execution created another background `tail -F` process, resulting in hundreds of orphaned 
+processes accumulating on the server.
+
+---
+
+# Root Cause
+
+The issue was caused by the script implementation.
+
+The monitoring script used:
+```bash
+tail -F <logfile> &
+```
+
+to start background log monitoring.
+However, the script did not include any cleanup mechanism to terminate the background process after execution.
+Each execution left behind an orphaned `tail -F` process, which continued running indefinitely.
+The issue was **not caused by Linux or the application**, but by the script design.
+
+---
+
+# Resolution
+
+Verified that the monitoring script was no longer executing.
+Identified all orphaned `HLR_AGENT_ERROR.sh` and `tail -F` processes.
+Safely terminated the orphaned processes.
+
+```bash
+pkill -f HLR_AGENT_ERROR.sh
+pkill -f "tail -F"
+```
+
+Alternatively, specific PIDs were terminated where required.
+
+```bash
+kill -9 <PID>
+```
+
+Verified that only valid application processes remained.
+
+```bash
+ps -ef | grep -i tail
+ps -ef | grep -i HLR_AGENT_ERROR
+```
+
+---
+
+# Validation
+
+Validated the server after cleanup.
+
+Confirmed:
+
+- No orphaned `tail -F` processes remained.
+- No unnecessary shell processes remained.
+- The monitoring script was no longer running.
+- Application services continued operating normally.
+- No new orphaned processes were created.
+
+---
+
+# Preventive Measures
+
+- Avoid launching `tail -F` as an uncontrolled background process.
+- Capture background process IDs (`$!`) and terminate them before script completion.
+- Use proper process cleanup (`trap` or `kill`) within shell scripts.
+- Perform periodic reviews of long-running background processes.
+- Review monitoring scripts before deployment to production.
+
+---
+
+# Business Impact
+
+- Removed hundreds of unnecessary orphaned background processes.
+- Prevented continuous accumulation of stale `tail -F` processes.
+- Reduced unnecessary process table entries.
+- Identified and documented the root cause instead of repeatedly clearing processes.
+- Improved the stability and maintainability of the application's log monitoring solution.
+
+---
+
+# Technologies Used
+
+- Red Hat Enterprise Linux
+- Bash Shell Scripting
+- Process Management
+
+---
+
+# Skills Demonstrated
+
+- Linux Production Support
+- Incident Handling
+- Root Cause Analysis (RCA)
+- Process Management
+- Shell Script Debugging
+- Bash Scripting
+- Production Troubleshooting
+- Performance Analysis
+
+---
+
+# Key Learning
+
+Long-running background processes should always be managed within the script lifecycle. In this incident, repeated executions of a monitoring 
+script continuously spawned `tail -F` processes without terminating them, resulting in orphaned processes accumulating over time. Identifying 
+the script design flaw resolved the issue permanently instead of repeatedly killing orphaned processes after each execution.

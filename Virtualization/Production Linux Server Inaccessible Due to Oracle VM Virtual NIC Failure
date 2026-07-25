@@ -1,0 +1,151 @@
+## Incident Summary
+
+A production Linux virtual machine became inaccessible over the network, preventing users from connecting through SSH or other remote management 
+tools. Although the operating system remained operational, the server was unreachable due to a virtual network adapter issue within the 
+Oracle VM (OVM) environment.
+
+The issue was isolated to the VM's virtual NIC, and network connectivity was restored by attaching a new virtual network interface.
+
+---
+
+## Initial Symptoms
+
+* Production Linux server inaccessible over the network.
+* SSH connection failed.
+* Ping requests timed out.
+* Monitoring reported the server as unreachable.
+* Applications hosted on the server became inaccessible.
+
+---
+
+## Investigation
+
+### Initial Findings
+
+* Confirmed the virtual machine was powered on.
+* Accessed the server through the Oracle VM console.
+* Verified that the Linux operating system was running normally.
+* Checked network configuration inside the guest operating system.
+* Observed that the configured network interface was not functioning correctly despite the operating system being healthy.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+The virtual network interface attached to the virtual machine had become non-functional within the Oracle VM environment.
+
+Although the guest operating system remained operational, network traffic was no longer passing through the virtual NIC, resulting in complete 
+loss of external connectivity.
+
+### Technical Cause
+
+* Oracle VM virtual NIC malfunction.
+* Guest operating system healthy.
+* Network configuration inside Linux remained unchanged.
+* Virtual network connectivity interrupted at the hypervisor layer.
+
+---
+
+## Resolution Process
+
+### Step 1: Console Access
+
+Accessed the virtual machine using the Oracle VM console to eliminate operating system failure as the cause.
+
+### Step 2: Network Verification
+
+Validated the Linux network configuration and confirmed that the issue originated from the virtual network adapter rather than the operating system.
+
+### Step 3: Virtual NIC Replacement
+
+Created a new virtual network adapter in Oracle VM and attached it to the affected virtual machine.
+
+Configured the operating system to use the newly attached interface.
+
+### Step 4: Validation
+
+Verified that:
+
+* Network connectivity was restored.
+* SSH access was successful.
+* Applications became accessible.
+* Monitoring returned to a healthy state.
+
+---
+
+## Additional Recommendation
+
+During the investigation, it was observed that the server had been running continuously for approximately **2,177 days (nearly six years)** without 
+a reboot.
+
+A planned maintenance activity was recommended to:
+
+* Perform a complete server backup.
+* Schedule a controlled reboot during a maintenance window.
+* Validate hardware and operating system health after reboot.
+
+Since the system had remained online for an extended period, there was a possibility of hardware or driver-related issues becoming visible during 
+or after the restart.
+
+---
+
+## Final Outcome
+
+* Production server connectivity restored.
+* New Oracle VM virtual NIC functioning normally.
+* SSH and application access successfully recovered.
+* No operating system changes were required.
+* Preventive maintenance recommended due to prolonged system uptime.
+
+---
+
+## Preventive Measures
+
+* Periodically verify virtual NIC health in Oracle VM environments.
+* Monitor virtual machine network interfaces for abnormal behaviour.
+* Schedule planned maintenance for long-running production servers.
+* Perform complete backups before rebooting systems with extended uptime.
+* Review virtualization platform logs when guest operating systems remain healthy but lose connectivity.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* A server becoming unreachable does not always indicate an operating system failure.
+* Hypervisor-level virtual hardware failures can isolate an otherwise healthy virtual machine.
+* Console access is invaluable for distinguishing guest OS issues from virtualization issues.
+* Long-running production systems should undergo planned maintenance to reduce operational risk.
+
+---
+
+## Severity
+
+**Production Infrastructure – Critical Virtual Machine Network Connectivity Issue**
+
+---
+
+## Skills Demonstrated
+
+* Linux System Administration
+* Oracle VM (OVM) Administration
+* Virtual Machine Troubleshooting
+* Virtual Network Adapter Management
+* Network Connectivity Analysis
+* Root Cause Analysis (RCA)
+* Production Incident Management
+* Infrastructure Support
+* Preventive Maintenance Planning
+
+---
+
+## Business Impact
+
+* Restored production server connectivity with minimal downtime.
+* Avoided unnecessary operating system recovery procedures.
+* Identified the issue at the virtualization layer, reducing troubleshooting time.
+* Improved infrastructure reliability through proactive maintenance recommendations.
+* Reduced the risk of future outages by recommending backup and planned reboot for a long-running production server.

@@ -1,0 +1,138 @@
+**Resolving Persistent Storage Latency Alerts on VMware Firewall Server Through Planned Reboot**
+
+## Overview
+
+The monitoring platform was generating **daily storage latency alerts** for the **ATT FW1 server**. Although the alerts occurred 
+regularly, no hardware failures, datastore issues, or storage connectivity problems were identified during the investigation.
+
+Further analysis revealed that the server had been running continuously for **1,636 days without a reboot**. A comparison with the secondary 
+firewall server (FW2), which had been rebooted recently, showed significantly fewer storage latency alerts and normal performance.
+
+To eliminate potential resource inefficiencies caused by the prolonged uptime, a planned maintenance window was scheduled to reboot the server.
+
+---
+
+## Problem Statement
+
+The ATT FW1 server was continuously generating storage latency alerts.
+
+During the investigation:
+
+* No storage hardware faults were detected.
+* Datastores remained healthy.
+* No disk failures were reported.
+* Applications remained operational.
+
+However, the server had an exceptionally long uptime of **1,636 days**, making it a potential contributor to the recurring performance alerts.
+
+---
+
+## Investigation
+
+Reviewed the server uptime.
+
+```bash
+uptime
+```
+
+Verified storage and filesystem status.
+
+```bash
+df -h
+```
+
+Reviewed system logs for storage or hardware-related errors.
+
+```bash
+dmesg | grep -i error
+```
+
+Compared monitoring data between:
+
+* ATT FW1 (long uptime)
+* ATT FW2 (recently rebooted)
+
+FW2 exhibited normal latency metrics with minimal alerts, while FW1 continued to generate frequent storage latency alerts despite having similar 
+workloads.
+
+The comparison suggested that prolonged system uptime was contributing to degraded resource efficiency rather than an underlying hardware issue.
+
+---
+
+## Root Cause
+
+No hardware or storage failures were identified.
+
+The recurring storage latency alerts were attributed to the server's prolonged uptime of **1,636 days**, which can contribute to:
+
+* Resource inefficiencies
+* Memory fragmentation
+* Driver-level resource exhaustion
+* Performance degradation over time
+
+These conditions can gradually affect system responsiveness and storage I/O performance, even when the underlying hardware remains healthy.
+
+---
+
+## Resolution
+
+A planned maintenance window was scheduled to perform a controlled reboot of the server.
+
+The following activities were completed:
+
+* Notified stakeholders and obtained change approval.
+* Gracefully shut down application services where applicable.
+* Rebooted the ATT FW1 server.
+* Verified successful system startup.
+* Confirmed all services were running normally.
+* Monitored storage latency metrics after the reboot.
+
+---
+
+## Validation
+
+Performed post-maintenance validation.
+
+Verified:
+
+```bash
+uptime
+```
+
+Confirmed:
+
+* Server reboot completed successfully.
+* All application services started normally.
+* Storage remained healthy.
+* No hardware errors were detected.
+* Storage latency alerts were no longer generated.
+* Performance metrics were consistent with the recently rebooted FW2 server.
+
+---
+
+## Outcome
+
+* Successfully completed the planned reboot.
+* Eliminated recurring storage latency alerts.
+* Improved overall server performance.
+* Restored normal storage latency metrics.
+* No production impact was observed during or after the maintenance activity.
+
+---
+
+## Technologies Used
+
+* VMware ESXi
+* Linux Administration
+* Infrastructure Monitoring
+* Storage Performance Monitoring
+* Change Management
+* Production Support
+
+---
+
+## Key Learning
+
+Servers with exceptionally long uptimes can gradually experience reduced performance due to accumulated resource inefficiencies, even when no 
+hardware faults are present. Periodic maintenance reboots, performed during approved maintenance windows, help refresh system resources, 
+improve overall stability, and prevent recurring performance-related alerts.

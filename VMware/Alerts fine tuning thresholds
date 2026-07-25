@@ -1,0 +1,117 @@
+**VMware ESXi Storage Latency Alert Fine-Tuning for SSD-Based Datastore**
+
+## Overview
+
+The monitoring platform was generating frequent storage latency alerts for the **MX2 ESXi host (10.235.16.7)**. Analysis revealed that the alerts 
+consistently occurred during scheduled backup and Data Warehouse (DWH) processing windows.
+
+The storage infrastructure uses **SSD-backed datastores**, which are capable of handling temporary spikes in read/write latency during intensive 
+I/O operations without impacting virtual machine performance.
+
+To reduce unnecessary alert noise while maintaining effective monitoring, the latency thresholds were reviewed and updated based on workload 
+characteristics and infrastructure capabilities.
+
+---
+
+## Problem Statement
+
+Storage latency alerts were being triggered frequently during:
+
+* Scheduled backup jobs
+* Data Warehouse (DWH) workloads
+* High disk I/O maintenance windows
+
+Although alerts were generated, there was:
+
+* No VM performance degradation
+* No storage failures
+* No application impact
+* No datastore connectivity issues
+
+The existing thresholds were configured too aggressively for the SSD storage environment, resulting in repeated false-positive alerts.
+
+---
+
+## Investigation
+
+Reviewed historical monitoring data and correlated alert timestamps with scheduled infrastructure activities.
+
+Observed that latency spikes occurred only during:
+
+* Backup execution windows
+* Heavy database write operations
+* DWH batch processing
+
+Verified VMware performance metrics and confirmed that latency returned to normal once the workload completed.
+
+Since the storage was SSD-based, temporary latency increases during high I/O operations were within acceptable operational limits.
+
+---
+
+## Root Cause
+
+The monitoring thresholds were configured with values suitable for lower I/O workloads.
+
+As the environment grew and backup/DWH activities increased, temporary latency spikes exceeded the existing thresholds, generating unnecessary alerts.
+
+The issue was related to **monitoring configuration**, not storage performance.
+
+---
+
+## Resolution
+
+Reviewed historical performance data and updated the monitoring thresholds to values better aligned with the SSD storage capabilities and production 
+workload.
+
+| Metric                      | Warning | Critical |
+| --------------------------- | ------: | -------: |
+| Disk Write Latency          |   80 ms |   150 ms |
+| Disk Read Latency           |   40 ms |    80 ms |
+| Datastore Write Latency     |   80 ms |   150 ms |
+| Datastore Read Latency      |   50 ms |   100 ms |
+| Maximum Datastore Latency   |  120 ms |   250 ms |
+| VMware Disk Writes Averaged |    3000 |     5000 |
+
+These thresholds were selected to reduce false-positive alerts while ensuring genuine storage performance issues would still be detected.
+
+---
+
+## Validation
+
+After implementing the updated thresholds, monitoring was observed during subsequent backup and DWH processing windows.
+
+Validated that:
+
+* Expected workload-related latency spikes no longer generated unnecessary alerts.
+* Storage performance remained healthy.
+* Virtual machines continued to operate normally.
+* No application performance issues were observed.
+* Genuine storage anomalies would still exceed the revised thresholds and generate alerts.
+
+---
+
+## Outcome
+
+* Reduced repetitive storage latency alerts during expected workload windows.
+* Improved monitoring accuracy by eliminating false-positive alerts.
+* Better aligned alert thresholds with SSD storage performance characteristics.
+* Enabled operations teams to focus on genuine infrastructure issues instead of expected workload-related events.
+
+---
+
+## Technologies Used
+
+* VMware ESXi
+* SSD Storage
+* VMware Performance Metrics
+* Infrastructure Monitoring
+* Performance Threshold Tuning
+* Production Monitoring
+
+---
+
+## Key Learning
+
+Alert thresholds should be periodically reviewed as infrastructure and workloads evolve. SSD-backed storage can sustain short periods of elevated 
+latency during backup and database operations without affecting production services. Fine-tuning monitoring thresholds based on historical 
+performance data helps reduce alert fatigue while preserving visibility into real storage performance issues.

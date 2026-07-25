@@ -1,0 +1,141 @@
+Recovery of Linux Server After System Ownership Corruption Without Reboot
+
+## Overview
+
+A production Linux server became inaccessible for administrative operations after the ownership of critical operating system files and libraries was 
+accidentally changed from `root` to a non-privileged application user (`msp_dev`).
+
+As a result, the `sudo` command failed with **Permission denied**, preventing administrators from performing privileged operations over SSH. 
+The incident had remained unresolved for nearly a month because the assumed recovery approach required a server reboot into rescue mode.
+
+During investigation, it was discovered that an authenticated root console session was still active. Using this existing root session, the ownership 
+of the affected system files was restored without rebooting the server, eliminating downtime and restoring administrative access immediately.
+
+---
+
+## Environment
+
+| Component | Details |
+|-----------|---------|
+| Operating System | Red Hat Enterprise Linux |
+| Issue | Incorrect Ownership of System Files |
+| Impact | sudo Permission Denied |
+| Recovery Method | Existing Root Console Session |
+
+---
+
+## Problem Statement
+
+Administrators reported that:
+
+- SSH login was successful.
+- `sudo` failed with **Permission denied**.
+- Administrative tasks could not be performed.
+- Recovery was believed to require rebooting into rescue mode.
+
+The incident remained pending because reboot approval was required.
+
+---
+
+## Investigation
+
+Verified the ownership of critical operating system directories.
+
+```bash
+ls -ld /bin /sbin /usr /lib /lib64
+```
+
+Observed that ownership of critical files had changed from:
+
+```text
+root:root
+```
+
+to
+
+```text
+msp_dev:msp_dev
+```
+
+Further investigation indicated that a recursive `chown -R` command had accidentally modified ownership of system directories.
+
+Although SSH administrative access was unavailable due to the broken `sudo` binary, an existing authenticated root session was found on the server 
+console.
+
+---
+
+## Root Cause
+
+An unintended recursive `chown -R` operation changed the ownership of critical operating system files from `root` to the application user 
+(`msp_dev`).
+
+This resulted in:
+
+- Broken `sudo` functionality.
+- Loss of administrative privileges over SSH.
+- Inability to execute privileged commands.
+- Delayed recovery because rescue mode was initially considered the only option.
+
+---
+
+## Resolution
+
+Instead of rebooting the server into rescue mode, the existing authenticated root console session was used.
+
+Verified the ownership of affected directories and binaries.
+
+Restored ownership of the operating system files back to `root:root`.
+
+Verified the `sudo` binary permissions and ownership.
+
+Validated that privileged commands executed successfully.
+
+Confirmed SSH users could again use `sudo` without any issues.
+
+No reboot or service interruption was required.
+
+---
+
+## Validation
+
+Verified:
+
+- Critical system files restored to `root:root`.
+- `sudo` functioning normally.
+- Administrative access restored over SSH.
+- Applications remained online throughout the recovery.
+- No reboot or rescue mode required.
+
+---
+
+## Outcome
+
+- Successfully resolved a month-old production issue.
+- Avoided server downtime by recovering the system without rebooting.
+- Restored ownership of critical operating system files.
+- Recovered full administrative access.
+- Returned the server to normal production operation immediately.
+
+---
+
+## Technologies Used
+
+- Red Hat Enterprise Linux
+- Linux File Ownership
+- Linux Permissions
+- sudo
+- Linux Console Administration
+- Production Incident Recovery
+
+---
+
+## Key Learning
+
+Before planning disruptive recovery procedures such as rescue mode or server reboot, it is important to verify whether an authenticated root session 
+already exists on the system console. In this incident, an existing root console session provided the necessary administrative access to restore 
+ownership of critical operating system files, avoiding downtime and resolving a month-old issue without impacting production services.
+````
+
+This is a valuable case study because it highlights **problem-solving and minimizing downtime**, which are highly regarded in Linux System 
+Administrator and DevOps roles. It demonstrates that you looked beyond the obvious recovery path and used an existing root console session to 
+restore the server safely.

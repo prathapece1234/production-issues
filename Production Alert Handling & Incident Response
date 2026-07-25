@@ -447,6 +447,71 @@ Verified:
 
 ---
 
+# Alert 7 – High Network Interface Traffic
+
+## Alert
+
+```text
+Critical
+
+movweb2
+Network Interface TrafficIn Alert
+Interface : ens192
+Traffic In : 651378401.4 Kbps
+
+movdb6
+Linux Network Interface TrafficOut
+Interface : ens192
+Traffic Out : 308371498.7 Kbps
+```
+
+---
+
+## Investigation
+
+Verified the real-time network interface utilization.
+
+```bash
+ifstat
+```
+
+Checked active network connections and bandwidth utilization.
+
+```bash
+iftop -i ens192
+```
+
+Verified whether any backup, replication, or bulk data transfer activities were running.
+
+Confirmed that a scheduled backup job was in progress.
+
+- **movdb6** was writing backup data.
+- **movweb2** was receiving backup traffic.
+
+The observed network throughput matched the expected backup workload.
+
+---
+
+## Root Cause
+
+The high network interface utilization was caused by the scheduled backup process transferring a large volume of data between the servers.
+
+No abnormal traffic, network issues, or application problems were identified.
+
+The alert was generated because the monitoring threshold was exceeded during the backup window.
+
+---
+
+## Resolution
+
+* Verified the backup job was running successfully.
+* Confirmed the network traffic was expected.
+* Monitored interface utilization using `ifstat` and `iftop`.
+* No service restart or network troubleshooting was required.
+* Continued monitoring until the backup completed and network utilization returned to normal.
+
+---
+
 
 # Key Skills Demonstrated
 
@@ -456,6 +521,9 @@ Verified:
 * VMware Administration
 * PostgreSQL Monitoring
 * Storage Administration
+* Network Traffic Analysis
+* Backup Activity Verification
+* Alert Investigation
 * Capacity Planning
 * Root Cause Analysis (RCA)
 * Cross-Team Coordination

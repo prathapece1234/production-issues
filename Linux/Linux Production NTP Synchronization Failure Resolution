@@ -1,0 +1,141 @@
+## Incident Summary
+
+Two production database servers (`db1` and `db2`) were unable to synchronize with the configured NTP server. Although the NTP service was 
+operational and manual synchronization was forced, the servers failed to update their system time. The issue was traced to an incorrect network 
+routing path caused by the production default gateway.
+
+---
+
+## Initial Symptoms
+
+* NTP synchronization failed.
+* Manual time synchronization (`chronyc makestep`) was unsuccessful.
+* Time offset remained unchanged.
+* No synchronization with the configured NTP source.
+* Application teams reported time drift concerns.
+* Production services required accurate system time for consistency.
+
+---
+
+## Investigation
+
+### Initial Findings
+
+* Verified the `chronyd` service was running normally.
+* Confirmed the NTP server configuration was correct.
+* Forced synchronization using `chronyc makestep`, but the issue persisted.
+* Verified network connectivity and routing.
+* Examined the routing table using `ip route`.
+* Identified that traffic destined for the NTP server was leaving through the default gateway on interface `ens192`.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+Both production database servers were configured with the default gateway on the production interface (`ens192`). The NTP server was reachable only 
+through the database network (`ens224`), causing synchronization traffic to follow the wrong network path.
+
+### Why the Default Route Was Not Changed
+
+Changing the default gateway to the database interface would have redirected all production database traffic, creating a risk of service disruption. 
+Therefore, modifying the default route was not a viable solution.
+
+---
+
+## Resolution Process
+
+### Step 1: Route Analysis
+
+Reviewed the routing table and confirmed that NTP traffic was using the incorrect gateway.
+
+### Step 2: Workaround Implementation
+
+Added a dedicated host-specific static route for the NTP server through the database interface (`ens224`) instead of modifying the production 
+default route.
+
+Example:
+
+```bash
+ip route add <NTP_SERVER_IP>/32 via <GATEWAY_IP> dev ens224
+```
+
+### Step 3: Manual Synchronization
+
+Forced an immediate synchronization after updating the routing table.
+
+```bash
+chronyc makestep
+```
+
+### Step 4: Validation
+
+Verified successful synchronization using:
+
+```bash
+chronyc tracking
+chronyc sources -v
+```
+
+Confirmed that the system time synchronized successfully while production database traffic continued to use the existing default route.
+
+---
+
+## Final Outcome
+
+* NTP synchronization restored successfully.
+* Production database traffic remained unaffected.
+* No changes were made to the existing default gateway.
+* Accurate system time restored across database servers.
+* Production services continued without interruption.
+
+---
+
+## Preventive Measures
+
+* Validate routing whenever NTP synchronization fails.
+* Verify the network path using `ip route get <NTP_SERVER_IP>`.
+* Use host-specific static routes when only one destination requires an alternate gateway.
+* Avoid changing default routes on production database servers unless absolutely necessary.
+* Include routing verification as part of standard NTP troubleshooting procedures.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* NTP failures can originate from network routing rather than service configuration.
+* Multi-homed Linux servers require careful route planning.
+* Host-specific static routes provide a safe alternative to changing production default gateways.
+* Understanding Linux routing behaviour is essential for troubleshooting infrastructure services.
+
+---
+
+## Severity
+
+**Production Infrastructure – Critical Time Synchronization Issue**
+
+---
+
+## Skills Demonstrated
+
+* Linux System Administration
+* Network Routing Analysis
+* Static Route Configuration
+* NTP (Chrony) Administration
+* Production Troubleshooting
+* Root Cause Analysis (RCA)
+* Infrastructure Support
+* Enterprise Linux Networking
+
+---
+
+## Business Impact
+
+* Restored accurate time synchronization across production database servers.
+* Eliminated time drift affecting production workloads.
+* Avoided changes to the production default gateway.
+* Prevented potential database communication issues.
+* Improved reliability of infrastructure services while maintaining production availability.

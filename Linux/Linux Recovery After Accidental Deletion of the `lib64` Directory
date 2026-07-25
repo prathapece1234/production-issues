@@ -1,0 +1,171 @@
+## Incident Summary
+
+A development Linux server became completely inaccessible after the critical `/lib64` directory was accidentally deleted. The deletion removed the 
+shared libraries required by the operating system, preventing essential binaries and services from executing.
+
+The server failed to boot normally and became unusable. A manual recovery was performed by booting into Red Hat rescue mode, mounting the affected 
+filesystem, and restoring the required system packages and libraries.
+
+---
+
+## Initial Symptoms
+
+* Server became inaccessible immediately after deletion.
+* SSH connectivity unavailable.
+* System failed to boot normally.
+* Essential Linux commands could not execute.
+* Multiple services failed during startup.
+* Operating system became non-functional.
+
+---
+
+## Investigation
+
+### Initial Findings
+
+The following commands had been executed on the server:
+
+```bash
+cd /lib64
+rm -rf *
+```
+
+The `/lib64` directory is one of the most critical directories in Linux and contains shared libraries required by:
+
+* System binaries
+* Shell utilities
+* Package management tools
+* System services
+* Boot processes
+* User applications
+
+Because these libraries were removed, the operating system could no longer execute required binaries.
+
+---
+
+## Root Cause
+
+### Primary Issue
+
+A recursive deletion command (`rm -rf *`) was executed inside the `/lib64` directory, removing all shared library files.
+
+### Technical Cause
+
+* Critical operating system libraries deleted.
+* Dynamic linker dependencies missing.
+* Core system binaries unable to load required shared objects.
+* Linux operating system unable to complete the boot process.
+
+---
+
+## Resolution Process
+
+### Step 1: Boot into Rescue Environment
+
+Booted the virtual machine using the Red Hat rescue environment.
+
+### Step 2: Mount the Root Filesystem
+
+Mounted the affected root filesystem to access the damaged operating system.
+
+### Step 3: Restore Critical Libraries
+
+Recovered the missing shared libraries by reinstalling the required RPM packages.
+
+More than:
+
+* **300+ RPM packages**
+* **3000+ shared library files**
+
+were restored to rebuild the operating system library dependencies.
+
+### Step 4: System Validation
+
+Verified that:
+
+* Critical libraries were restored.
+* Essential commands executed successfully.
+* Required services started normally.
+* The operating system booted successfully.
+* SSH connectivity was restored.
+
+### Step 5: User Guidance
+
+Provided guidance to the application owner regarding Linux system directories and explained the risks of deleting operating system files.
+
+---
+
+## Final Outcome
+
+* Operating system successfully recovered.
+* Boot process restored.
+* Linux shared libraries rebuilt.
+* Production functionality restored without rebuilding the server.
+* User educated on handling critical Linux directories.
+
+---
+
+## Preventive Measures
+
+* Restrict write access to critical system directories.
+* Avoid executing destructive commands as the root user without validation.
+* Implement regular virtual machine snapshots or backups.
+* Educate users on Linux filesystem hierarchy and protected directories.
+* Establish change approval for operations involving system directories.
+
+---
+
+## Key Learning
+
+### Major Insights
+
+* `/lib64` is a critical operating system directory containing shared libraries required by nearly every executable on Linux.
+* Deleting `/lib64`, `/lib`, `/usr/lib`, or `/usr/lib64` can render the operating system unbootable.
+* Recovery often requires rescue mode and manual package restoration.
+* Rebuilding a damaged Linux system is significantly more complex than preventing accidental deletion.
+* Administrative access should be used with extreme caution when working in core operating system directories.
+
+---
+
+## Severity
+
+**Critical – Linux Operating System Recovery**
+
+---
+
+## Skills Demonstrated
+
+* Linux System Administration
+* Red Hat Enterprise Linux Recovery
+* Rescue Mode Administration
+* RPM Package Recovery
+* Shared Library Restoration
+* Boot Failure Troubleshooting
+* Root Cause Analysis (RCA)
+* Disaster Recovery
+* Production Support
+* Infrastructure Recovery
+
+---
+
+## Business Impact
+
+* Successfully recovered the server without requiring a complete operating system rebuild.
+* Restored thousands of missing shared libraries and critical system packages.
+* Minimized downtime by performing manual operating system recovery.
+* Reduced the risk of similar incidents through user awareness and operational guidance.
+* Improved operational procedures for handling privileged access and critical system files.
+
+---
+
+## Best Practices
+
+> **Never delete the following directories on a Linux system:**
+
+* `/lib`
+* `/lib64`
+* `/usr/lib`
+* `/usr/lib64`
+
+These directories contain the shared libraries required for the Linux kernel, system binaries, package management tools, services, and user 
+applications. Accidental deletion can leave the operating system unbootable and may require extensive manual recovery.

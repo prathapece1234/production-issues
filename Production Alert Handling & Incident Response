@@ -582,6 +582,108 @@ The files belonged to the application, so cleanup required application owner ver
 - Continued monitoring inode utilization after cleanup.
 
 ---
+Here's **Alert 9** in the same format and style as your **Alert 8**.
+
+---
+
+# Alert 9 – False Application Down Alerts Due to SNMP Monitoring Issue
+
+## Alert
+
+```text
+Critical
+Resource : BE1 Server
+Alert : Multiple Application Down Alerts
+
+Affected Applications :
+- HLR Services
+- XIUS Services
+- CAP Services
+
+Status :
+Applications continuously reported as DOWN and UP intermittently.
+
+Monitoring Impact :
+Unable to determine the actual health of applications due to continuous false alerts.
+```
+
+---
+
+## Investigation
+
+Verified the overall health of the BE1 server.
+
+```bash
+top
+free -h
+uptime
+df -h
+```
+
+All system resources were within normal operating limits.
+
+Verified that all production application processes were running.
+
+```bash
+ps -ef | grep -i hlr
+ps -ef | grep -i xius
+```
+
+Confirmed that all HLR and XIUS application processes were active and had not restarted unexpectedly.
+
+Reviewed system logs for any application or operating system failures.
+
+```bash
+journalctl
+dmesg
+tail -f /var/log/messages
+```
+
+No application crashes, kernel errors, or resource exhaustion were observed.
+
+Since the operating system and applications were healthy, the investigation shifted to the monitoring layer.
+
+Checked the SNMP service.
+
+```bash
+systemctl status snmpd
+```
+
+Although the SNMP daemon was running, monitoring continued to report intermittent application failures.
+
+Restarted the SNMP service to restore monitoring communication.
+
+```bash
+systemctl restart snmpd
+```
+
+After the restart, the monitoring team confirmed that polling resumed successfully and the false alerts disappeared.
+
+---
+
+## Root Cause
+
+The production applications and operating system were functioning normally throughout the incident.
+
+The issue was caused by an SNMP communication problem following the previous day's incident, preventing the monitoring platform from collecting accurate application status.
+
+As a result, the monitoring system generated continuous false application down alerts even though all services remained operational.
+
+---
+
+## Resolution
+
+* Verified server CPU, memory, disk, and load.
+* Confirmed all HLR and XIUS application processes were running normally.
+* Reviewed system logs and found no operating system or application issues.
+* Verified the SNMP service status.
+* Restarted the SNMP daemon to restore monitoring communication.
+* Confirmed with the monitoring team that polling resumed successfully.
+* Validated that all false application down alerts were automatically cleared.
+
+---
+
+
 
 # Key Skills Demonstrated
 

@@ -1,0 +1,220 @@
+**Production User Provisioning: Secure SFTP Environment Creation for External File Exchange**
+
+## Overview
+
+A production request was received to provision a secure SFTP environment for an external customer (**MERIDA**) on the backup server. The requirement 
+included creating a dedicated SFTP directory, provisioning a restricted user account, assigning secure permissions, and validating secure file 
+transfer operations.
+
+The SFTP environment was successfully configured following Linux security best practices, and end-to-end validation was performed by uploading and 
+downloading test files to ensure the customer could securely exchange data.
+
+---
+
+## Environment
+
+| Component        | Details                  |
+| ---------------- | ------------------------ |
+| Operating System | Red Hat Enterprise Linux |
+| Service          | OpenSSH SFTP             |
+| Server           | BKP1                     |
+| Server IP        | 10.230.200.55            |
+| User             | merida                   |
+| Directory        | /app2/MERIDA             |
+| Environment      | Production               |
+
+---
+
+## Problem Statement
+
+The customer requested a dedicated and secure SFTP location for exchanging files with the production environment.
+
+Requirements included:
+
+* Create a dedicated SFTP directory.
+* Provision a new Linux user.
+* Generate a secure password following Linux password standards.
+* Configure appropriate ownership and permissions.
+* Validate file upload and download functionality.
+
+---
+
+## Requirements
+
+* Create a dedicated SFTP user.
+* Create the requested directory structure.
+* Apply secure ownership and permissions.
+* Ensure only the intended user has access.
+* Validate end-to-end SFTP functionality.
+* Share credentials securely with the customer.
+
+---
+
+## Implementation
+
+### Step 1 – Create the Directory Structure
+
+Created the requested SFTP directory.
+
+```bash
+mkdir -p /app2/MERIDA
+```
+
+Verified the directory was created successfully.
+
+---
+
+### Step 2 – Create the Linux User
+
+Provisioned a dedicated SFTP user.
+
+```bash
+useradd merida
+```
+
+Assigned a strong password compliant with Linux security standards.
+
+Password characteristics included:
+
+* Uppercase letters
+* Lowercase letters
+* Numbers
+* Special characters
+* Minimum security length
+
+The password was shared securely with the customer through the approved communication channel.
+
+---
+
+### Step 3 – Configure Directory Ownership
+
+Assigned ownership of the directory.
+
+Example:
+
+```bash
+chown merida:merida /app2/MERIDA
+```
+
+Applied appropriate directory permissions.
+
+```bash
+chmod 750 /app2/MERIDA
+```
+
+This ensured only authorized users could access the directory while protecting the contents from unauthorized access.
+
+---
+
+### Step 4 – Validate SFTP Access
+
+Verified user authentication.
+
+Connected using SFTP.
+
+```bash
+sftp merida@10.230.200.55
+```
+
+Successfully authenticated.
+
+---
+
+### Step 5 – Functional Validation
+
+Performed end-to-end testing.
+
+Uploaded a test file.
+
+```text
+put testfile.txt
+```
+
+Downloaded the same file.
+
+```text
+get testfile.txt
+```
+
+Validated:
+
+* Successful login
+* File upload
+* File download
+* File integrity
+* Directory permissions
+
+No permission or authentication errors were observed.
+
+---
+
+## Root Cause
+
+This was a planned production implementation request to provision a secure SFTP environment for a new external customer.
+
+No infrastructure or application issues were encountered during implementation.
+
+---
+
+## Validation
+
+Verified the following after implementation:
+
+* SFTP user created successfully.
+* Secure password configured.
+* Directory created successfully.
+* Correct ownership applied.
+* Required permissions configured.
+* User authentication successful.
+* File upload successful.
+* File download successful.
+* End-to-end functionality validated.
+
+---
+
+## Outcome
+
+* Successfully provisioned a dedicated SFTP environment.
+* Implemented secure Linux user management.
+* Configured appropriate directory permissions.
+* Validated complete file transfer functionality.
+* Delivered credentials securely to the customer.
+* Production-ready SFTP service handed over without issues.
+
+---
+
+## Implementation Summary
+
+| Component             | Status     |
+| --------------------- | ---------- |
+| Linux User            | Created    |
+| SFTP Access           | Configured |
+| Directory             | Created    |
+| Ownership             | Applied    |
+| Permissions           | Configured |
+| Authentication        | Successful |
+| File Upload           | Successful |
+| File Download         | Successful |
+| Production Validation | Completed  |
+
+---
+
+## Technologies Used
+
+* Red Hat Enterprise Linux
+* OpenSSH
+* SFTP
+* Linux User Management
+* File System Permissions
+* SSH Authentication
+* Production Administration
+* Secure File Transfer
+
+---
+
+## Key Learning
+
+Provisioning a secure SFTP environment involves more than creating a user account. Proper directory ownership, permission management, secure 
+password policies, and end-to-end validation are essential to ensure reliable and secure file exchange. Verifying both upload and download operations
+before handover helps identify permission or configuration issues early and ensures a smooth customer onboarding experience.
+

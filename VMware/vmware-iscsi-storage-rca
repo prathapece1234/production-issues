@@ -1,0 +1,283 @@
+**Production Storage Incident: Root Cause Analysis of Intermittent iSCSI Datastore Connectivity on VMware ESXi**
+
+## Overview
+
+A production application experienced intermittent I/O delays and temporary service disruption. Initial investigation on the guest Linux server 
+showed no operating system, filesystem, or application-level abnormalities. However, VMware infrastructure logs revealed intermittent connectivity 
+issues between the ESXi host and the shared iSCSI storage.
+
+The incident affected the **Application-recorder** datastore, causing temporary SCSI transport timeouts, VMFS heartbeat failures, storage path 
+evaluation, and increased I/O latency. VMware's Native Multipathing (NMP) automatically recovered the affected storage path, restoring normal 
+datastore access without data corruption.
+
+---
+
+## Environment
+
+| Component        | Details                          |
+| ---------------- | -------------------------------- |
+| Hypervisor       | VMware ESXi                      |
+| Storage Protocol | iSCSI                            |
+| Datastore        | Application-recorder             |
+| Guest OS         | Red Hat Enterprise Linux         |
+| Storage          | Shared SAN Storage               |
+| Multipathing     | VMware Native Multipathing (NMP) |
+
+---
+
+## Problem Statement
+
+The application team reported intermittent application slowness and I/O-related failures.
+
+Initial Linux server analysis confirmed:
+
+* No kernel errors
+* No filesystem corruption
+* No storage errors
+* Normal CPU and memory utilization
+* Normal Linux I/O statistics
+
+However, VMware generated datastore connectivity events similar to:
+
+```text id="e2xktw"
+Lost access to volume Application-recorder due to connectivity issues.
+Recovery attempt is in progress.
+```
+
+---
+
+## Requirements
+
+* Identify the root cause of the application impact.
+* Verify Linux operating system health.
+* Investigate VMware infrastructure logs.
+* Determine whether the issue originated from the guest OS, ESXi host, storage array, or network.
+* Validate datastore recovery.
+
+---
+
+## Architecture
+
+```text id="zc2o6m"
+                 Application VM
+                        │
+                 Linux (RHEL)
+                        │
+                    VMFS Datastore
+                        │
+                VMware ESXi Host
+                        │
+              iSCSI Storage Network
+                        │
+                 Shared SAN Storage
+```
+
+---
+
+## Investigation
+
+### Step 1 – Guest Operating System Analysis
+
+Reviewed:
+
+* `/var/log/messages`
+* `journalctl`
+* Linux I/O statistics (`sar`)
+* CPU utilization
+* Memory utilization
+* Filesystem status
+
+Result:
+
+* No kernel panic
+* No filesystem errors
+* No I/O errors
+* No storage warnings
+
+The guest operating system was functioning normally.
+
+---
+
+### Step 2 – VMware Event Analysis
+
+vCenter reported:
+
+```text id="im4mcu"
+Lost access to volume Application-recorder due to connectivity issues.
+Recovery attempt is in progress.
+```
+
+This confirmed the issue originated below the guest operating system.
+
+---
+
+### Step 3 – VMkernel Log Analysis
+
+VMkernel logs showed repeated SCSI transport failures.
+
+Example:
+
+```text id="knj9gk"
+ScsiDeviceIO:
+Cmd failed
+H:0x5
+```
+
+Host status **H:0x5** indicates a transport timeout where the storage device failed to respond within the configured timeout period.
+
+No media errors were reported.
+
+---
+
+### Step 4 – VMFS Heartbeat Failure
+
+Immediately after the timeout:
+
+```text id="m0omw7"
+HB IO was cancelled.
+Disk contents unknown.
+```
+
+VMFS cancelled heartbeat writes to protect datastore consistency during the transport interruption.
+
+This message does **not** indicate data corruption.
+
+---
+
+### Step 5 – Native Multipathing (NMP)
+
+VMware Native Multipathing detected the storage path as unhealthy.
+
+```text id="ur1m2w"
+NMP device state in doubt.
+Requested fast path state update.
+```
+
+The affected path entered **EVAL** state while VMware searched for a healthy path.
+
+---
+
+### Step 6 – Virtual Device Reset
+
+During recovery:
+
+```text id="xgsjlwm"
+IO was aborted by VMFS via a virt-reset.
+```
+
+VMware performed a virtual device reset to clear outstanding I/O operations before resuming normal storage access.
+
+---
+
+### Step 7 – Latency Analysis
+
+During path recovery, storage latency temporarily increased.
+
+Average latency:
+
+```text id="4rwp7m"
+12 ms
+
+↓
+
+2871 ms
+```
+
+The latency spike was temporary and expected while pending I/O requests were retried.
+
+Performance returned to baseline after path stabilization.
+
+---
+
+### Step 8 – Storage Statistics Review
+
+Reviewed ESXi storage statistics.
+
+Observed:
+
+* Historical failed commands
+* Temporary transport failures
+* No disk media errors
+* No permanent device failures
+* No datastore corruption
+
+Storage response normalized after connectivity recovery.
+
+---
+
+## Root Cause
+
+A temporary interruption occurred on the **iSCSI transport path between the ESXi host and the shared storage array**.
+
+During the interruption:
+
+* SCSI transport commands timed out.
+* VMware cancelled pending I/O operations.
+* VMFS suspended heartbeat updates.
+* Native Multipathing initiated path evaluation.
+* VMware automatically recovered the storage path once connectivity was restored.
+
+The incident was caused by transient storage connectivity rather than guest operating system failures or storage media defects.
+
+---
+
+## Validation
+
+Validated after recovery:
+
+* Datastore accessible.
+* VM remained operational.
+* Linux filesystem healthy.
+* Application recovered.
+* Storage latency returned to normal.
+* Path evaluation completed successfully.
+* No data corruption detected.
+
+---
+
+## Outcome
+
+* Successfully identified the issue outside the guest operating system.
+* Confirmed VMware Native Multipathing handled the failure as designed.
+* Verified automatic datastore recovery.
+* Ruled out Linux operating system and filesystem issues.
+* Determined the incident was related to temporary iSCSI transport connectivity.
+
+---
+
+## Root Cause Analysis (RCA)
+
+| Component          | Status                                              |
+| ------------------ | --------------------------------------------------- |
+| Linux Guest OS     | Healthy                                             |
+| Filesystem         | Healthy                                             |
+| Application Server | No local issues detected                            |
+| ESXi Host          | Detected storage transport timeout                  |
+| VMFS               | Triggered heartbeat protection                      |
+| NMP                | Performed automatic path evaluation                 |
+| Storage Array      | No media failure observed                           |
+| Root Cause         | Temporary iSCSI transport connectivity interruption |
+
+---
+
+## Technologies Used
+
+* VMware ESXi
+* VMFS
+* VMware Native Multipathing (NMP)
+* iSCSI
+* SAN Storage
+* Red Hat Enterprise Linux
+* VMkernel Log Analysis
+* Storage Performance Monitoring
+* Infrastructure Troubleshooting
+
+---
+
+## Key Learning
+
+Application storage issues do not always originate from the guest operating system. In this incident, Linux reported no abnormalities, while VMware 
+infrastructure logs identified intermittent iSCSI transport timeouts between the ESXi host and the shared storage. Understanding the VMware storage 
+stack—including VMkernel logs, VMFS heartbeat mechanisms, and Native Multipathing—is essential for accurately identifying infrastructure-level 
+storage incidents and distinguishing them from operating system or storage hardware failures.
+

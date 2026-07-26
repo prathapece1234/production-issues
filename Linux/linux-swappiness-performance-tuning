@@ -1,0 +1,241 @@
+**Production Performance Tuning: Resolving High Swap Utilization by Optimizing Linux Swappiness**
+
+## Overview
+
+A production customer reported unexpectedly high swap memory utilization on multiple Linux servers, despite the systems having sufficient available 
+RAM. The concern was that excessive swap usage might impact application performance and indicate a potential memory leak.
+
+An investigation was performed across the affected servers to analyze memory consumption, kernel memory management, and swap behavior. While no 
+memory exhaustion or application issues were identified, differences in the Linux **swappiness** configuration explained the inconsistent swap 
+utilization between servers.
+
+By tuning the swappiness value to align with production standards, unnecessary swap usage was eliminated without requiring any hardware upgrades or 
+application changes.
+
+---
+
+## Environment
+
+| Component         | Details                                        |
+| ----------------- | ---------------------------------------------- |
+| Operating System  | Red Hat Enterprise Linux                       |
+| Environment       | Production                                     |
+| Affected Servers  | munmspdata5, munmspdata6, munmspbe1, munmspbe2 |
+| Memory Management | Linux Virtual Memory                           |
+| Kernel Parameter  | vm.swappiness                                  |
+
+---
+
+## Problem Statement
+
+The customer observed high swap utilization on multiple production servers and requested an investigation into why swap was being consumed even 
+though sufficient physical memory appeared to be available.
+
+Memory utilization varied across servers, but two servers had nearly **100% swap utilization** despite relatively low RAM consumption.
+
+---
+
+## Requirements
+
+* Investigate the cause of high swap utilization.
+* Verify whether memory exhaustion existed.
+* Compare memory management across affected servers.
+* Identify configuration differences.
+* Recommend an optimized solution.
+
+---
+
+## Investigation
+
+### Step 1 – Verify Memory Utilization
+
+Collected memory statistics using:
+
+```bash
+free -h
+```
+
+The analysis showed that all servers still had sufficient physical memory available.
+
+Example:
+
+| Server      | RAM Used | Available Memory | Swap Usage |
+| ----------- | -------- | ---------------- | ---------- |
+| munmspbe1   | ~63%     | 13 GB            | 1.7 GB     |
+| munmspbe2   | ~63%     | 13 GB            | 2 GB       |
+| munmspdata5 | ~38%     | 14 GB            | 11 GB      |
+| munmspdata6 | ~38%     | 14 GB            | 11 GB      |
+
+At first glance, the Data servers appeared abnormal because swap was fully utilized while more than half of the physical memory remained available.
+
+---
+
+### Step 2 – Verify System Load
+
+Reviewed:
+
+* CPU utilization
+* Load average
+* Running processes
+* Memory pressure
+* Application performance
+
+No abnormal resource utilization or memory-intensive processes were observed.
+
+The operating system remained stable throughout the investigation.
+
+---
+
+### Step 3 – Compare Kernel Memory Configuration
+
+Compared the Linux virtual memory settings across all affected servers.
+
+Checked:
+
+```bash
+cat /proc/sys/vm/swappiness
+```
+
+Results:
+
+| Server      | Swappiness |
+| ----------- | ---------- |
+| munmspbe1   | 30         |
+| munmspbe2   | 30         |
+| munmspdata5 | 60         |
+| munmspdata6 | 60         |
+
+This configuration difference immediately stood out.
+
+---
+
+### Step 4 – Analyze Swap Behaviour
+
+Further analysis showed:
+
+* BE servers used swap minimally despite higher RAM utilization.
+* Data servers aggressively moved inactive pages to swap even though sufficient RAM remained available.
+
+No evidence suggested:
+
+* Memory leaks
+* Out-of-memory conditions
+* Kernel memory exhaustion
+* Application memory issues
+
+The observed behavior was consistent with Linux virtual memory management using a higher swappiness value.
+
+---
+
+## Root Cause
+
+The affected Data servers were configured with a **swappiness value of 60**, while the BE servers used **30**.
+
+A higher swappiness value causes the Linux kernel to move inactive memory pages to swap more aggressively, even when adequate physical memory is 
+still available.
+
+As a result:
+
+* RAM utilization remained relatively low.
+* Swap usage gradually increased until it reached 100%.
+* Applications continued operating normally, but the high swap utilization created concern and could potentially impact performance over time.
+
+The issue was therefore configuration-related rather than a hardware or application problem.
+
+---
+
+## Resolution
+
+To align the servers with the production standard, the swappiness value was reduced.
+
+Current value:
+
+```bash
+cat /proc/sys/vm/swappiness
+```
+
+Applied the updated configuration:
+
+```bash
+sysctl -w vm.swappiness=30
+```
+
+Persisted the configuration:
+
+```text
+vm.swappiness = 30
+```
+
+Reloaded the kernel parameters.
+
+```bash
+sysctl --system
+```
+
+---
+
+## Validation
+
+After applying the new swappiness value:
+
+Verified:
+
+* Reduced swap activity
+* Stable memory utilization
+* Healthy application performance
+* No increase in CPU or memory pressure
+* No abnormal kernel events
+
+Observed behaviour:
+
+* RAM usage increased as expected.
+* Swap utilization gradually reduced.
+* Servers continued operating normally.
+
+---
+
+## Outcome
+
+* Successfully identified that high swap utilization was caused by kernel memory management configuration.
+* Standardized the swappiness value across production servers.
+* Reduced unnecessary swap consumption.
+* Improved memory utilization efficiency.
+* No application downtime or hardware upgrades were required.
+
+---
+
+## Root Cause Analysis (RCA)
+
+| Component      | Status                                        |
+| -------------- | --------------------------------------------- |
+| CPU            | Healthy                                       |
+| Memory         | Sufficient Available                          |
+| Disk           | Healthy                                       |
+| Applications   | Running Normally                              |
+| Memory Leak    | Not Observed                                  |
+| Kernel         | Working as Designed                           |
+| Swappiness     | Configured Higher (60)                        |
+| **Root Cause** | High swappiness causing aggressive swap usage |
+
+---
+
+## Technologies Used
+
+* Red Hat Enterprise Linux
+* Linux Virtual Memory
+* Swap Management
+* Kernel Parameter Tuning
+* `free`
+* `sysctl`
+* `/proc/sys/vm/swappiness`
+* Production Performance Tuning
+* Root Cause Analysis
+
+---
+
+## Key Learning
+
+High swap utilization does not necessarily indicate insufficient physical memory or a memory leak. Linux uses swap based on the configured 
+**vm.swappiness** value, which controls how aggressively inactive memory pages are moved from RAM to swap. Comparing kernel parameters across 
+similar production systems can quickly reveal configuration differences that explain unexpected behavior. Standardizing kernel tuning values helps 
+maintain consistent memory management and avoids unnecessary swap usage.

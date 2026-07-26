@@ -1,0 +1,199 @@
+**Production Server Resource Upgrade: Online CPU and Memory Expansion on Ubuntu VM**
+
+## Overview
+
+A production Ubuntu virtual machine required a hardware resource upgrade to match the configuration of an existing production server. The objective 
+was to increase the virtual CPU and memory of **192.168.144.77** to align with the configuration of **192.168.144.76**, ensuring consistent 
+application performance across both servers.
+
+Although the hypervisor supported **CPU and Memory Hot Plug**, Ubuntu did not automatically recognize the newly added CPUs. While the additional 
+memory became available immediately, the newly allocated CPUs remained in the **offline** state and required manual activation through the Linux CPU 
+hotplug interface.
+
+---
+
+## Environment
+
+| Component        | Details                      |
+| ---------------- | ---------------------------- |
+| Operating System | Ubuntu Linux                 |
+| Upgrade Type     | Online CPU & Memory Hot Plug |
+
+
+---
+
+## Existing Configuration
+
+| Resource | Before              | After       |
+| -------- | ------------------- | ----------- |
+| vCPU     | Existing Allocation | **8 vCPUs** |
+| Memory   | Existing Allocation | **16 GB**   |
+
+---
+
+## Requirements
+
+* Increase CPU allocation to **8 vCPUs**.
+* Increase memory allocation to **16 GB**.
+* Perform the upgrade with minimal service interruption.
+* Validate that the operating system recognizes the newly assigned resources.
+* Bring newly added CPUs online without requiring a server reboot.
+
+---
+
+## Implementation
+
+### Step 1 – Verify Existing Resources
+
+Checked the current CPU and memory allocation before making changes.
+
+```bash
+nproc
+
+lscpu
+
+free -h
+```
+
+---
+
+### Step 2 – Increase Virtual Hardware
+
+Using VMware vSphere, increased the virtual hardware allocation for the target VM.
+
+* CPU: **8 vCPUs**
+* Memory: **16 GB**
+
+The VM was configured with **CPU Hot Plug** and **Memory Hot Plug**, allowing resources to be added without shutting down the server.
+
+---
+
+### Step 3 – Verify Memory Recognition
+
+Immediately after the upgrade, Ubuntu detected the additional memory.
+
+```bash
+free -h
+```
+
+Memory reflected the newly allocated **16 GB** without requiring any manual intervention.
+
+---
+
+### Step 4 – Verify CPU Recognition
+
+Checked the number of available processors.
+
+```bash
+nproc
+```
+
+The newly added CPUs were **not** visible.
+
+Verified the processor status.
+
+```bash
+lscpu
+```
+
+Reviewed the CPU online/offline status.
+
+```bash
+cat /sys/devices/system/cpu/offline
+```
+
+The output indicated that the newly allocated CPUs were present but remained in the **offline** state.
+
+---
+
+### Step 5 – Bring CPUs Online
+
+Enabled each offline processor using the Linux CPU hotplug interface.
+
+Example:
+
+```bash
+echo 1 > /sys/devices/system/cpu/cpu4/online
+echo 1 > /sys/devices/system/cpu/cpu5/online
+echo 1 > /sys/devices/system/cpu/cpu6/online
+echo 1 > /sys/devices/system/cpu/cpu7/online
+```
+
+Alternatively:
+
+```bash
+for cpu in /sys/devices/system/cpu/cpu[0-9]*; do
+    [ -f "$cpu/online" ] && echo 1 > "$cpu/online"
+done
+```
+
+---
+
+### Step 6 – Validate CPU Availability
+
+Confirmed that all processors were online.
+
+```bash
+cat /sys/devices/system/cpu/online
+```
+
+Verified the updated CPU count.
+
+```bash
+nproc
+```
+
+Confirmed the system recognized all **8 vCPUs**.
+
+---
+
+## Validation
+
+Validated the following after the upgrade:
+
+* Memory increased to **16 GB**.
+* All **8 vCPUs** became available.
+* No reboot was required.
+* Application services remained operational.
+* System performance matched the reference server configuration.
+
+---
+
+## Root Cause
+
+Although VMware Hot Plug successfully added the virtual CPUs, Ubuntu did not automatically enable the newly attached processors. The additional 
+CPUs remained in the **offline** state until they were manually brought online through the Linux CPU hotplug interface located under 
+`/sys/devices/system/cpu/`.
+
+---
+
+## Outcome
+
+* Successfully upgraded the production VM resources.
+* Matched the hardware configuration of the reference server.
+* Restored full CPU availability without requiring a reboot.
+* Minimized production downtime by performing an online resource expansion.
+* Verified application stability after the upgrade.
+
+---
+
+## Technologies Used
+
+* Ubuntu Linux
+* VMware ESXi
+* vSphere Client
+* Linux CPU Hotplug
+* Memory Hotplug
+* Linux System Administration
+* Production Infrastructure Management
+
+---
+
+## Key Learning
+
+CPU and Memory Hot Plug behave differently on Linux systems. While Ubuntu typically recognizes newly added memory immediately, additional virtual 
+CPUs may remain **offline** even after a successful hypervisor upgrade. Administrators should verify CPU status using the Linux CPU hotplug 
+interface and manually enable offline processors when necessary. This approach allows production systems to benefit from online CPU expansion 
+without requiring a reboot.
+
+

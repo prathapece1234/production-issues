@@ -1,0 +1,229 @@
+**Production Monitoring Incident: Resolving False ESXi Host Down Alerts Caused by Incorrect DNS Resolution**
+
+## Overview
+
+A production monitoring system (OpsRamp) generated critical alerts indicating that multiple VMware ESXi hosts were **100% packet loss (DOWN)**. 
+According to the monitoring dashboard, the affected hosts were unreachable, raising concerns about a potential infrastructure outage.
+
+However, manual verification showed that the ESXi hosts were online, accessible through the vSphere Host Client, and operating normally. This 
+discrepancy initiated a detailed investigation involving the monitoring platform, VMware vCenter, DNS configuration, and hostname resolution.
+
+The root cause was ultimately traced to an incorrect DNS server configuration used during hostname resolution, causing OpsRamp to discover the ESXi 
+hosts with incorrect IP addresses. After correcting the DNS configuration and rescanning the hosts, monitoring was restored successfully.
+
+---
+
+## Environment
+
+| Component               | Details             |
+| ----------------------- | ------------------- |
+| Virtualization Platform | VMware ESXi         |
+| Management Platform     | VMware vCenter      |
+| Monitoring Tool         | OpsRamp             |
+| Hardware                | Dell PowerEdge R450 |
+| Environment             | Production          |
+
+---
+
+## Problem Statement
+
+OpsRamp generated critical alerts reporting that the following ESXi hosts were **DOWN (100% Packet Loss)**:
+
+* MUNMSPR450VSP3R1.coremovil.local
+* MUNMSPR450VSP6R1.coremovil.local
+
+The monitoring console displayed IP addresses that differed from the actual management IPs configured on the ESXi hosts.
+
+At first glance, this appeared to be a host or network outage.
+
+---
+
+## Requirements
+
+* Verify whether the ESXi hosts were actually unavailable.
+* Identify why OpsRamp reported incorrect IP addresses.
+* Determine whether the issue originated from VMware, monitoring, or DNS.
+* Restore accurate monitoring without affecting production services.
+
+---
+
+## Investigation
+
+### Step 1 – Verify ESXi Host Availability
+
+The first step was to validate whether the reported hosts were genuinely down.
+
+Verified:
+
+* ESXi Host Client accessibility
+* vCenter inventory
+* Management network connectivity
+* ICMP reachability
+* Host health
+
+**Result**
+
+* Both ESXi hosts were reachable.
+* vCenter reported the hosts as healthy.
+* No hardware or network failures were observed.
+
+This confirmed that the monitoring alert was a false positive.
+
+---
+
+### Step 2 – Review Monitoring Information
+
+Compared the information displayed in OpsRamp with the VMware environment.
+
+Observed:
+
+* Hostnames matched correctly.
+* IP addresses displayed in OpsRamp did **not** match the actual ESXi management IP addresses.
+
+This indicated that the monitoring platform had associated the hostnames with incorrect IP addresses.
+
+---
+
+### Step 3 – Vendor Investigation
+
+A support case was raised with the OpsRamp (HPE) support team.
+
+Initial investigation by the vendor could not identify the root cause, as the monitoring platform continued to associate the ESXi hostnames with 
+unexpected IP addresses.
+
+The issue required further infrastructure-level investigation.
+
+---
+
+### Step 4 – Verify Hostname Resolution
+
+Attention shifted to DNS resolution.
+
+Hostname resolution was tested from multiple locations.
+
+Initial verification using the configured resolver returned the same incorrect IP address observed in OpsRamp.
+
+However, querying the project's authoritative DNS server directly returned the expected management IP address.
+
+Example:
+
+```bash
+nslookup MUNMSPR450VSP3R1.coremovil.local <Project_DNS_Server>
+```
+
+The hostname resolved correctly when queried against the project DNS server.
+
+This confirmed that different DNS servers were returning different responses for the same hostname.
+
+---
+
+### Step 5 – Identify DNS Configuration Mismatch
+
+Reviewed the DNS configuration used by the system performing hostname resolution.
+
+Checked:
+
+```bash
+cat /etc/resolv.conf
+```
+
+The configured DNS server was not the project's authoritative DNS server.
+
+Because of this, hostname lookups returned incorrect IP addresses, which were subsequently discovered and stored by OpsRamp during host discovery.
+
+---
+
+## Root Cause
+
+The system responsible for hostname resolution was configured to use an incorrect DNS server.
+
+As a result:
+
+* ESXi hostnames resolved to incorrect IP addresses.
+* VMware discovery imported incorrect management IPs into OpsRamp.
+* ICMP monitoring targeted invalid IP addresses.
+* OpsRamp reported 100% packet loss even though the ESXi hosts were healthy.
+
+The issue was caused by inconsistent DNS resolution rather than a VMware, network, or hardware failure.
+
+---
+
+## Resolution
+
+Updated the DNS configuration to use the project's authoritative DNS server.
+
+Modified:
+
+```text
+/etc/resolv.conf
+```
+
+Verified hostname resolution again.
+
+```bash
+nslookup <hostname>
+```
+
+The hostname now resolved to the correct ESXi management IP.
+
+The monitoring team then performed a host rescan in OpsRamp.
+
+---
+
+## Validation
+
+After rescanning:
+
+* Correct management IP addresses were discovered.
+* ESXi hosts appeared online in OpsRamp.
+* ICMP monitoring succeeded.
+* 100% packet loss alerts cleared automatically.
+* VMware host status remained healthy.
+
+---
+
+## Outcome
+
+* Successfully identified a DNS configuration mismatch affecting monitoring.
+* Eliminated false infrastructure alerts.
+* Restored accurate ESXi host monitoring.
+* Avoided unnecessary VMware and network troubleshooting.
+* Improved monitoring reliability by ensuring consistent DNS resolution.
+
+---
+
+## Root Cause Analysis (RCA)
+
+| Component            | Status                                                                          |
+| -------------------- | ------------------------------------------------------------------------------- |
+| VMware ESXi Hosts    | Healthy                                                                         |
+| vCenter              | Healthy                                                                         |
+| Network Connectivity | Healthy                                                                         |
+| ICMP                 | Working with correct IP                                                         |
+| OpsRamp              | Monitoring incorrect IP                                                         |
+| DNS                  | Incorrect resolver configuration                                                |
+| **Root Cause**       | Incorrect DNS server causing hostname resolution mismatch during host discovery |
+
+---
+
+## Technologies Used
+
+* VMware ESXi
+* VMware vCenter
+* OpsRamp Monitoring
+* DNS
+* Linux Name Resolution
+* `/etc/resolv.conf`
+* ICMP Monitoring
+* Infrastructure Monitoring
+* Production Troubleshooting
+* Root Cause Analysis
+
+---
+
+## Key Learning
+
+Monitoring alerts should always be validated before assuming an infrastructure outage. In this incident, the ESXi hosts, VMware environment, 
+and network were all operating normally, but inconsistent DNS resolution caused the monitoring platform to associate hostnames with incorrect IP 
+addresses. Systematically comparing monitoring data, VMware inventory, and DNS responses helped isolate the issue to a configuration mismatch. 
+This case highlights the importance of validating name resolution paths during infrastructure discovery and monitoring integration.

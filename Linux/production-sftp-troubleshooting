@@ -1,0 +1,203 @@
+**Production SFTP Troubleshooting: Resolving SFTP Login Failure Due to Incorrect Chroot Directory Permissions**
+
+## Overview
+
+A production SFTP service began failing unexpectedly, preventing application users from transferring files to a remote Linux server. Although the 
+SSH service was reachable and the user authentication prompt appeared successfully, the SFTP session was terminated immediately after login with a 
+**"Connection reset by peer"** error.
+
+A systematic troubleshooting process was performed to isolate the issue. After eliminating network connectivity, firewall, and authentication 
+problems, the root cause was identified as **incorrect ownership and permissions on the configured ChrootDirectory**. Correcting the directory 
+permissions restored normal SFTP functionality without impacting other services.
+
+---
+
+## Environment
+
+| Component        | Details                  |
+| ---------------- | ------------------------ |
+| Operating System | Red Hat Enterprise Linux |
+| Service          | OpenSSH (SFTP)           |
+| Protocol         | SFTP over SSH            |
+| Authentication   | Username & Password      |
+| Port             | 22                       |
+| Environment      | Production               |
+
+---
+
+## Problem Statement
+
+Users were unable to establish an SFTP session with the production server.
+
+Error observed:
+
+```bash
+$ sftp MARVEL_SFTP@10.103.195.114
+
+MARVEL_SFTP@10.103.195.114's password:
+
+packet_write_wait: Connection to 10.103.195.114 port 22: Broken pipe
+Couldn't read packet: Connection reset by peer
+```
+
+Although authentication was accepted, the SSH server immediately closed the connection before the SFTP session was established.
+
+---
+
+## Requirements
+
+* Restore production SFTP connectivity.
+* Identify the root cause of the unexpected session termination.
+* Validate secure SFTP access after implementing the fix.
+* Minimize service downtime.
+
+---
+
+## Investigation
+
+### Step 1 – Verify Network Connectivity
+
+Confirmed that the server was reachable over the network.
+
+```bash
+ping 10.103.195.114
+```
+
+Network connectivity was healthy with no packet loss.
+
+---
+
+### Step 2 – Verify SSH Port Availability
+
+Confirmed that the SSH service was listening on port 22.
+
+```bash
+nc -zv 10.103.195.114 22
+```
+
+The connection was established successfully, eliminating firewall and network issues.
+
+---
+
+### Step 3 – Enable SSH Debug Logging
+
+Executed SSH in verbose mode to identify the stage at which the connection failed.
+
+```bash
+ssh -vvv MARVEL_SFTP@10.103.195.114
+```
+
+The debug output showed that authentication completed successfully, but the server terminated the session immediately afterwards.
+
+---
+
+### Step 4 – Review OpenSSH Configuration
+
+Verified the following:
+
+* SSH daemon (`sshd`) status
+* `sshd_config`
+* SFTP subsystem configuration
+* Authentication logs
+* User account configuration
+* Chroot configuration
+
+No authentication or SSH service issues were identified.
+
+---
+
+## Root Cause
+
+The SFTP user was configured to use a **ChrootDirectory** within the OpenSSH configuration.
+
+OpenSSH requires that the configured chroot directory:
+
+* Be owned by the **root** user.
+* Not be writable by the SFTP user.
+* Have secure directory permissions.
+
+The chroot directory ownership had been modified, violating OpenSSH security requirements. As a result, the SSH daemon terminated the session 
+immediately after successful authentication, generating the **"Connection reset by peer"** error.
+
+---
+
+## Resolution
+
+Verified the current directory ownership and permissions.
+
+```bash
+ls -ld /sftp/MARVEL_SFTP
+```
+
+Corrected the ownership and permissions.
+
+```bash
+chown root:root /sftp/MARVEL_SFTP
+chmod 755 /sftp/MARVEL_SFTP
+```
+
+Created a dedicated writable directory for the SFTP user.
+
+```bash
+mkdir -p /sftp/MARVEL_SFTP/upload
+chown MARVEL_SFTP:MARVEL_SFTP /sftp/MARVEL_SFTP/upload
+chmod 755 /sftp/MARVEL_SFTP/upload
+```
+
+Validated the SSH configuration.
+
+```bash
+sshd -t
+```
+
+Restarted the SSH service.
+
+```bash
+systemctl restart sshd
+```
+
+---
+
+## Validation
+
+Verified the following after implementing the fix:
+
+* Successful SFTP login.
+* File upload functionality.
+* File download functionality.
+* Directory listing.
+* Application connectivity.
+* Scheduled production file transfers resumed successfully.
+
+---
+
+## Outcome
+
+* Successfully restored the production SFTP service.
+* Eliminated the "Connection reset by peer" error.
+* Ensured the ChrootDirectory complied with OpenSSH security requirements.
+* Restored scheduled file transfers without impacting other users.
+* Improved understanding of OpenSSH chroot security requirements for future deployments.
+
+---
+
+## Technologies Used
+
+* Red Hat Enterprise Linux
+* OpenSSH
+* SFTP
+* Linux File Permissions
+* Chroot Environment
+* SSH Debugging (`ssh -vvv`)
+* Systemd
+* Linux Security Administration
+
+---
+
+## Key Learning
+
+OpenSSH enforces strict ownership and permission requirements for `ChrootDirectory`. Even when user authentication succeeds, an incorrectly 
+configured chroot environment causes the SSH daemon to terminate the session immediately, resulting in errors such as **"Connection reset by peer"** 
+or **"Broken pipe"**. Following a structured troubleshooting approach—starting with network validation and progressing through SSH debugging and 
+configuration review—helps identify the root cause efficiently and minimise production downtime.
+

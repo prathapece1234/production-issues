@@ -1,0 +1,163 @@
+AWS EC2 Hardware Failure Recovery
+
+## Overview
+
+A production monitoring system generated a **Critical** alert indicating that a Linux server had become unreachable due to **100% packet 
+loss**. Initial investigation confirmed that the EC2 instance had stopped unexpectedly.
+
+Further analysis identified that the interruption was caused by an **underlying AWS infrastructure hardware failure**. The issue was 
+resolved by performing a **Stop/Start** operation, which migrated the instance to healthy physical hardware. After recovery, the server 
+resumed normal operation without any application or service impact.
+
+---
+
+# Incident Summary
+
+| Item        | Details                   |
+| ----------- | ------------------------- |
+| Platform    | Amazon EC2                |
+| Environment | Production                |
+| Alert Type  | Host Unreachable          |
+| Severity    | Critical                  |
+| Detection   | Infrastructure Monitoring |
+| Symptom     | 100% Packet Loss          |
+
+---
+
+# Alert Observed
+
+The monitoring platform generated a critical alert indicating that the server was unreachable.
+
+**Observed symptoms:**
+
+* Host not responding to network requests
+* 100% packet loss
+* SSH connectivity unavailable
+* Monitoring health checks failed
+
+---
+
+# Initial Investigation
+
+The following validation steps were performed after the alert was received:
+
+* Verified network reachability.
+* Confirmed SSH connectivity failure.
+* Checked infrastructure monitoring dashboards.
+* Reviewed EC2 instance state.
+* Verified AWS system and instance health checks.
+* Confirmed there were no planned maintenance activities.
+* Validated that production services were not impacted.
+
+---
+
+# Root Cause Analysis
+
+Investigation determined that the EC2 instance had **stopped automatically** due to a failed **AWS System Status Check**.
+
+The underlying cause was an **AWS hardware failure** affecting the physical host where the EC2 instance was running.
+
+The issue was infrastructure-related and was **not caused by**:
+
+* Operating system failure
+* Application failure
+* Resource exhaustion
+* Network configuration changes
+* User-initiated actions
+
+AWS confirmed that the incident originated from an underlying hardware fault on the host infrastructure.
+
+---
+
+# Resolution
+
+The following recovery actions were performed:
+
+1. Investigated the monitoring alert.
+2. Verified the EC2 instance health status.
+3. Raised an infrastructure support request for further investigation.
+4. Performed a **Stop/Start** operation on the affected EC2 instance.
+5. Allowed AWS to migrate the instance automatically to healthy physical hardware.
+6. Verified successful server startup.
+7. Confirmed network connectivity.
+8. Validated application functionality.
+9. Monitored the server to ensure stable operation.
+
+---
+
+# Post-Recovery Validation
+
+After the instance restart, the following checks were completed successfully:
+
+* EC2 instance entered the **Running** state.
+* AWS System Status Checks passed.
+* Instance Status Checks passed.
+* Network connectivity restored.
+* SSH access verified.
+* Monitoring alerts cleared automatically.
+* Applications and services operating normally.
+* No packet loss observed.
+* Overall system health restored.
+
+---
+
+# Timeline
+
+| Phase         | Activity                                       |
+| ------------- | ---------------------------------------------- |
+| Detection     | Critical monitoring alert received             |
+| Investigation | Verified server was unreachable                |
+| Analysis      | Confirmed infrastructure hardware failure      |
+| Escalation    | Infrastructure support engaged                 |
+| Recovery      | Stop/Start operation performed                 |
+| Migration     | EC2 automatically migrated to healthy hardware |
+| Validation    | Connectivity and application health verified   |
+| Closure       | Monitoring returned to normal                  |
+
+---
+
+# Root Cause
+
+The incident was caused by an **underlying hardware failure within the AWS infrastructure**, resulting in the EC2 instance becoming 
+unavailable.
+
+Restarting the instance initiated an automatic migration to a healthy physical host, resolving the issue without requiring operating 
+system or application changes.
+
+---
+
+# Outcome
+
+* Successfully identified the issue as an AWS infrastructure hardware failure.
+* Restored the production server through an EC2 Stop/Start operation.
+* Verified automatic migration to healthy AWS hardware.
+* Confirmed restoration of network connectivity and application availability.
+* Cleared all monitoring alerts.
+* Completed post-recovery validation with no recurring issues.
+
+---
+
+# Lessons Learned
+
+* Continuous infrastructure monitoring enables rapid detection of server availability issues.
+* AWS **System Status Checks** help distinguish infrastructure failures from operating system or application problems.
+* Performing a **Stop/Start** operation on an affected EC2 instance can trigger migration to healthy hardware when the root cause is an 
+  underlying infrastructure fault.
+* Comprehensive post-recovery validation is essential to confirm that networking, monitoring, and application services have returned to 
+  normal operation.
+
+---
+
+# Technologies & Skills Demonstrated
+
+* Amazon EC2
+* Linux System Administration
+* AWS Infrastructure Troubleshooting
+* Production Incident Management
+* Root Cause Analysis (RCA)
+* AWS Health Checks
+* Infrastructure Monitoring
+* Network Troubleshooting
+* Service Availability Validation
+* Incident Response
+* Production Operations Support

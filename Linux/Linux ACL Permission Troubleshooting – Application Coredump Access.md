@@ -478,10 +478,57 @@ cd /var/lib/systemd/coredump/
 ```bash
 zstd -d <coredump-file>.zst
 ```
-
 ---
 
-# 14. Security Considerations
+# 14. Persistent Default ACL for Future Coredump Files
+Default ACL Inheritance
+
+To ensure that the dev_oss permission is automatically inherited by future files and directories created under the coredump directory, configure a default ACL:
+
+setfacl -m d:u:dev_oss:rx,d:m:rx /var/lib/systemd/coredump/
+What this does
+d:u:dev_oss:rx
+
+Configures a default ACL granting dev_oss read and execute permissions on newly created objects under the directory.
+
+d:m:rx
+
+Sets the default ACL mask, which controls the maximum effective permission for the inherited named-user/group ACL entries.
+
+Verify
+getfacl /var/lib/systemd/coredump/
+
+Expected output should include:
+
+user::rwx
+user:dev_oss:r-x
+group::r-x
+mask::r-x
+other::r-x
+
+default:user::rwx
+default:user:dev_oss:r-x
+default:group::r-x
+default:mask::r-x
+default:other::r-x
+Important
+
+The d: prefix means these are default ACL entries for future objects.
+
+u:dev_oss:rx     → Current directory ACL
+d:u:dev_oss:rx   → Default ACL for future objects
+
+m:rx             → Current ACL mask
+d:m:rx           → Default ACL mask for future objects
+
+This configuration is intended for future inheritance. Existing coredump files are not automatically modified; their individual ACLs must be checked separately with:
+
+getfacl /var/lib/systemd/coredump/<coredump-file>.zst
+
+For a support user who only needs to read and analyze coredumps, rx on the directory follows the principle of least privilege.
+---
+
+# 15. Security Considerations
 
 Coredumps can contain sensitive application information, including:
 
@@ -505,7 +552,7 @@ ACLs provide a more controlled method of granting access to specific users.
 
 ---
 
-# 15. Best Practices
+# 16. Best Practices
 
 * Use ACLs instead of broad `777` permissions.
 * Always inspect the ACL mask.
@@ -521,7 +568,7 @@ ACLs provide a more controlled method of granting access to specific users.
 
 ---
 
-# 16. Key Learning
+# 17. Key Learning
 
 The main lesson from this incident was that an ACL entry alone does not guarantee the requested effective permission.
 
@@ -571,7 +618,7 @@ A user can have sufficient filesystem permissions while still being prohibited f
 
 ---
 
-# 17. Outcome
+# 18. Outcome
 
 The coredump directory ACL was corrected by explicitly granting `dev_oss` `rwx` permissions and updating the ACL mask to `rwx`.
 

@@ -1,159 +1,98 @@
-# Linux ACL Permission Troubleshooting – Application Coredump Access
+# Linux ACL Troubleshooting – Persistent Access to systemd Coredump Files
 
 ## 1. Overview
 
-This document describes a Linux production troubleshooting case where an application support user was unable to access and analyze 
-application coredump files stored under:
+This incident involved a Linux application support user, `dev_oss`, who required access to application coredump files generated 
+under:
 
 ```bash
 /var/lib/systemd/coredump/
 ```
 
-The affected user was:
+The initial problem was caused by the ACL mask restricting the effective permissions of the user.
+
+After correcting the ACL mask, a **second issue was identified**: newly generated coredump files were still being created with restrictive file permissions even though a default ACL had been configured on the coredump directory.
+
+Because the default ACL did not consistently provide the required effective permissions on newly generated coredump files, a **systemd path-triggered ACL remediation mechanism** was implemented.
+
+The final solution used:
 
 ```text
-dev_oss
+systemd .path
+      |
+      v
+coredump directory changes
+      |
+      v
+coredump-acl.service
+      |
+      v
+find newly/current coredump files
+      |
+      v
+setfacl
+      |
+      v
+dev_oss gets required access
 ```
 
-The initial ACL configuration granted `rwx` permissions to `dev_oss`, but the user still experienced permission-related issues.
+---
 
-Investigation identified that the **POSIX ACL mask was limiting the effective permissions** assigned to the user.
+# 2. Environment
 
-A separate issue was also identified when attempting to use `sudo`: the `dev_oss` account was not authorized to execute `/bin/zstd` 
-through sudo. This is a **sudoers authorization issue**, independent of the directory ACL problem.
+| Parameter          | Details                             |
+| ------------------ | ----------------------------------- |
+| OS                 | RHEL / Enterprise Linux             |
+| Application        | Seagull                             |
+| Coredump Service   | systemd-coredump                    |
+| Coredump Directory | `/var/lib/systemd/coredump/`        |
+| Support User       | `dev_oss`                           |
+| Coredump Format    | `.zst`                              |
+| ACL Tool           | `setfacl` / `getfacl`               |
+| Automation         | systemd service + systemd path unit |
 
 ---
 
-## 2. Environment
+# 3. Problem Statement
 
-| Parameter            | Details                      |
-| -------------------- | ---------------------------- |
-| Operating System     | RHEL / Enterprise Linux      |
-| Affected User        | `dev_oss`                    |
-| Directory            | `/var/lib/systemd/coredump/` |
-| File Type            | `.zst` compressed coredump   |
-| Application          | Seagull                      |
-| Access Method        | Linux filesystem ACL         |
-| Analysis Tool        | `zstd`                       |
-| Privilege Escalation | `sudo`                       |
+The application support user needed access to application coredumps for troubleshooting.
 
----
-
-## 3. Problem Statement
-
-The application support user needed access to application coredump files for troubleshooting.
-
-When attempting to access or decompress a coredump, the user received:
+Initial access resulted in:
 
 ```text
 Permission denied
 ```
 
-Example:
-
-```bash
-[dev_oss@testqeg coredump]$ zstd -d core.seagull.1001....zst
-zstd: ... : Permission denied
-```
-
-An ACL had already been configured for the user:
-
-```bash
-setfacl -R -m u:dev_oss:rwx /var/lib/systemd/coredump/
-```
-
-However, the expected access was not achieved.
-
----
-
-# 4. Investigation
-
-## 4.1 Check Directory ACL
-
-The first step was to inspect the ACL on the coredump directory.
+The directory ACL was inspected:
 
 ```bash
 getfacl /var/lib/systemd/coredump/
 ```
 
-Initial ACL:
+The original ACL contained:
 
 ```text
-# file: coredump/
-# owner: root
-# group: root
-
 user::rwx
-user:dev_oss:rwx        #effective:r-x
+user:dev_oss:rwx
 group::r-x
 mask::r-x
 other::r-x
 ```
 
-The important observation was:
-
-```text
-user:dev_oss:rwx
-#effective:r-x
-mask::r-x
-```
-
-Although `dev_oss` had been explicitly granted:
-
-```text
-rwx
-```
-
-the ACL mask restricted the effective permissions.
-
----
-
-# 5. Root Cause Analysis
-
-## ACL Mask Restriction
-
-POSIX ACLs use an ACL mask to limit the effective permissions of:
-
-* Named users
-* Named groups
-* The owning group
-
-In this case:
+The important finding was:
 
 ```text
 user:dev_oss:rwx
 mask::r-x
 ```
 
-resulted in:
-
-```text
-dev_oss effective permission = r-x
-```
-
-Therefore, the explicit `rwx` ACL entry did not translate into effective `rwx` access.
-
-### Before
-
-```text
-user:dev_oss:rwx
-mask::r-x
-```
-
-Effective:
+Therefore, the effective permission was restricted to:
 
 ```text
 r-x
 ```
 
-### Required
-
-```text
-user:dev_oss:rwx
-mask::rwx
-```
-
-Effective:
+instead of the intended:
 
 ```text
 rwx
@@ -161,47 +100,23 @@ rwx
 
 ---
 
-# 6. Resolution
+# 4. Initial Resolution – ACL Mask
 
-The ACL entry and ACL mask were corrected together:
+The ACL mask was corrected:
 
 ```bash
 setfacl -m u:dev_oss:rwx,m:rwx /var/lib/systemd/coredump/
 ```
 
-Where:
-
-```text
-u:dev_oss:rwx
-```
-
-grants the user read, write, and execute permissions.
-
-And:
-
-```text
-m:rwx
-```
-
-sets the ACL mask to allow those permissions to become effective.
-
----
-
-# 7. Validation
-
-The ACL was checked again:
+The ACL was verified:
 
 ```bash
 getfacl /var/lib/systemd/coredump/
 ```
 
-Final result:
+Result:
 
 ```text
-# file: coredump/
-# owner: root
-# group: root
-
 user::rwx
 user:dev_oss:rwx
 group::r-x
@@ -209,30 +124,45 @@ mask::rwx
 other::r-x
 ```
 
-The previous effective-permission limitation was removed.
+At this point, the existing directory permissions were correct.
 
-### Before
+---
 
-```text
-user:dev_oss:rwx
-#effective:r-x
-mask::r-x
+# 5. Persistent Default ACL
+
+To provide ACL inheritance for future filesystem objects, a default ACL was also configured:
+
+```bash
+setfacl -m d:u:dev_oss:rwx,d:m:rwx /var/lib/systemd/coredump/
 ```
 
-### After
+Verification:
+
+```bash
+getfacl /var/lib/systemd/coredump/
+```
+
+Expected:
 
 ```text
+user::rwx
 user:dev_oss:rwx
+group::r-x
 mask::rwx
+other::r-x
+
+default:user::rwx
+default:user:dev_oss:rwx
+default:group::r-x
+default:mask::rwx
+default:other::r-x
 ```
 
 ---
 
-# 8. Important File-Level Validation
+# 6. Problem Reappeared With New Coredumps
 
-A critical part of Linux ACL troubleshooting is distinguishing **directory permissions from file permissions**.
-
-The coredump directory ACL was corrected, but individual coredump files can have their own permissions and ACLs.
+Despite the directory ACL and default ACL being configured, newly generated coredump files were still observed with restrictive permissions.
 
 Example:
 
@@ -240,227 +170,562 @@ Example:
 ls -lrth /var/lib/systemd/coredump/
 ```
 
-Observed files included:
+showed files similar to:
 
 ```text
--rw-rwx---+ 1 root root 144K ... core.seagull....zst
 -rw-r-----+ 1 root root 144K ... core.seagull....zst
--rw-r-----+ 1 root root 143K ... core.seagull....zst
 ```
 
-The `+` at the end of the permission string indicates that an extended ACL exists.
+The important observation was that the **actual generated coredump file** did not consistently have the required access for `dev_oss`.
 
-Therefore, if the user can enter the directory but cannot read or decompress a particular `.zst` file, the next investigation should 
-be:
+Therefore, the investigation moved from:
+
+```text
+Directory ACL
+```
+
+to:
+
+```text
+Actual generated file ACL
+```
+
+---
+
+# 7. Root Cause
+
+The issue was not simply the directory permission.
+
+There were two separate ACL-related problems.
+
+### Initial problem
+
+The directory ACL mask restricted the effective permissions:
+
+```text
+user:dev_oss:rwx
+mask::r-x
+```
+
+### Recurring problem
+
+Even after configuring:
+
+```text
+default:user:dev_oss:rwx
+default:mask::rwx
+```
+
+new `systemd-coredump` files were still being generated with restrictive permissions.
+
+Therefore, relying only on the directory's default ACL did not provide the required operational result in this environment.
+
+The final solution was to automatically apply the required ACL to coredump files whenever the coredump directory changed.
+
+---
+
+# 8. Final Resolution
+
+A systemd service and path unit were created.
+
+The two files were:
+
+```text
+/etc/systemd/system/coredump-acl.service
+/etc/systemd/system/coredump-acl.path
+```
+
+---
+
+# 9. ACL Remediation Service
+
+File:
+
+```bash
+/etc/systemd/system/coredump-acl.service
+```
+
+Configuration:
+
+```ini
+[Unit]
+Description=Set ACL on systemd coredump files
+After=systemd-coredump@.service
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c 'find /var/lib/systemd/coredump/ -type f -exec setfacl -m u:dev_oss:rwx,m:rwx {} +'
+```
+
+### Purpose
+
+The service searches the coredump directory:
+
+```bash
+find /var/lib/systemd/coredump/ -type f
+```
+
+and applies:
+
+```bash
+setfacl -m u:dev_oss:rwx,m:rwx
+```
+
+to the files.
+
+Therefore, when the service executes, the coredump files receive the required ACL.
+
+---
+
+# 10. systemd Path Unit
+
+File:
+
+```bash
+/etc/systemd/system/coredump-acl.path
+```
+
+Configuration:
+
+```ini
+[Unit]
+Description=Monitor systemd coredump directory
+
+[Path]
+PathChanged=/var/lib/systemd/coredump
+Unit=coredump-acl.service
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### Purpose
+
+The `.path` unit monitors:
+
+```text
+/var/lib/systemd/coredump
+```
+
+When a filesystem change is detected, systemd triggers:
+
+```text
+coredump-acl.service
+```
+
+The resulting workflow is:
+
+```text
+New application crash
+        |
+        v
+systemd-coredump generates .zst
+        |
+        v
+/var/lib/systemd/coredump changes
+        |
+        v
+coredump-acl.path detects change
+        |
+        v
+coredump-acl.service starts
+        |
+        v
+find coredump files
+        |
+        v
+setfacl
+        |
+        v
+dev_oss access restored
+```
+
+---
+
+# 11. Enable and Start the Path Unit
+
+After creating the unit files:
+
+```bash
+systemctl daemon-reload
+```
+
+Enable the path unit:
+
+```bash
+systemctl enable coredump-acl.path
+```
+
+Start it:
+
+```bash
+systemctl start coredump-acl.path
+```
+
+Verify:
+
+```bash
+systemctl status coredump-acl.path
+```
+
+Expected state:
+
+```text
+Active: active (waiting)
+```
+
+---
+
+# 12. Verify the Service
+
+Check:
+
+```bash
+systemctl status coredump-acl.service
+```
+
+Because it is:
+
+```ini
+Type=oneshot
+```
+
+the service is expected to execute its command and exit.
+
+Check its logs:
+
+```bash
+journalctl -u coredump-acl.service
+```
+
+For the path unit:
+
+```bash
+journalctl -u coredump-acl.path
+```
+
+---
+
+# 13. Validate ACL on Coredump Files
+
+After a new coredump is generated:
+
+```bash
+ls -lrth /var/lib/systemd/coredump/
+```
+
+Then inspect the actual file:
 
 ```bash
 getfacl /var/lib/systemd/coredump/<coredump-file>.zst
 ```
 
-For example:
+The expected ACL should include:
 
-```bash
-getfacl core.seagull.1001.<timestamp>.zst
+```text
+user:dev_oss:rwx
+mask::rwx
 ```
 
-This determines whether the individual coredump file grants the required effective permission to `dev_oss`.
+The important point is that the ACL is now being applied to the **actual coredump file**, rather than relying only on directory inheritance.
 
 ---
 
-# 9. Directory vs File Permission
+# 14. Validate as `dev_oss`
 
-A useful troubleshooting distinction is:
+Switch to the affected user:
+
+```bash
+su - dev_oss
+```
+
+Access the directory:
+
+```bash
+cd /var/lib/systemd/coredump/
+```
+
+Test the coredump:
+
+```bash
+zstd -d <coredump-file>.zst
+```
+
+Alternatively, directly test read access:
+
+```bash
+test -r /var/lib/systemd/coredump/<coredump-file>.zst
+echo $?
+```
+
+Expected:
 
 ```text
-Directory ACL
+0
+```
+
+---
+
+# 15. Why the `.path` + `.service` Approach Was Used
+
+The final implementation was introduced because the following configuration alone did not provide a reliable operational result:
+
+```bash
+setfacl -m d:u:dev_oss:rwx,d:m:rwx /var/lib/systemd/coredump/
+```
+
+New coredump files were still observed with restrictive permissions.
+
+Instead of manually running:
+
+```bash
+setfacl -m u:dev_oss:rwx,m:rwx <file>
+```
+
+after every application crash, the ACL correction was automated.
+
+### Before
+
+```text
+Application crash
       |
-      +---- Controls ability to traverse/access directory
+      v
+New coredump
       |
-      +---- Does NOT automatically change ACLs on existing files
+      v
+Permission denied
+      |
+      v
+Administrator manually runs setfacl
 ```
 
-For a user to successfully read a coredump:
+### After
 
 ```text
-Directory
-   |
-   |-- Execute permission
-   |
-   v
-Coredump file
-   |
-   |-- Read permission
-   |
-   v
-zstd
-   |
-   v
-Coredump analysis
+Application crash
+      |
+      v
+New coredump
+      |
+      v
+Directory change detected
+      |
+      v
+systemd path unit
+      |
+      v
+ACL service
+      |
+      v
+setfacl automatically executed
+      |
+      v
+dev_oss access
 ```
 
-Therefore, fixing the directory ACL alone does not necessarily grant read access to every existing coredump file.
+This removed the need for manual intervention after each coredump generation.
 
 ---
 
-# 10. `sudo` Investigation
-
-During troubleshooting, the user also attempted:
-
-```bash
-sudo zstd -d <coredump-file>.zst
-```
-
-The system returned:
+# 16. Troubleshooting Flow
 
 ```text
-Sorry, user dev_oss is not allowed to execute
-'/bin/zstd -d ...'
-```
-
-This is a separate security control.
-
-The message indicates that the user is **not authorized by the sudo policy** to execute `/bin/zstd`.
-
-Therefore:
-
-```text
-Filesystem ACL problem
-        ≠
-sudo authorization problem
-```
-
-The ACL controls filesystem access.
-
-The sudoers configuration controls whether `dev_oss` can execute a command with elevated privileges.
-
----
-
-# 11. Sudo Validation
-
-The configured sudo permissions can be checked with:
-
-```bash
-sudo -l
-```
-
-or, where appropriate, by an administrator reviewing:
-
-```bash
-/etc/sudoers
-/etc/sudoers.d/
-```
-
-The recommended approach is to avoid granting unrestricted sudo access.
-
-If business requirements require elevated coredump analysis, use a narrowly scoped sudo rule rather than:
-
-```text
-dev_oss ALL=(ALL) ALL
-```
-
-A least-privilege approach should be used.
-
----
-
-# 12. Recommended ACL Troubleshooting Workflow
-
-```text
-Permission Denied
-       |
-       v
-Check current user
-       |
-       v
-id dev_oss
-       |
-       v
-Check directory permissions
-       |
-       v
-ls -ld /var/lib/systemd/coredump
-       |
-       v
-Check ACL
-       |
-       v
-getfacl /var/lib/systemd/coredump
-       |
-       v
-Check effective ACL permission
-       |
-       v
-Check ACL mask
-       |
-       v
+dev_oss receives Permission Denied
+              |
+              v
+Check directory ACL
+              |
+              v
+getfacl /var/lib/systemd/coredump/
+              |
+              v
+ACL mask found restrictive
+              |
+              v
 Correct user ACL + mask
-       |
-       v
-Check individual coredump file
-       |
-       v
-getfacl <coredump-file>
-       |
-       v
-Validate read permission
-       |
-       v
-Run zstd as dev_oss
-       |
-       +---- Permission denied
-       |          |
-       |          v
-       |     Check file ACL
-       |
-       +---- sudo denied
-                  |
-                  v
-             Check sudoers
+              |
+              v
+Configure default ACL
+              |
+              v
+New coredump generated
+              |
+              v
+Permission issue occurs again
+              |
+              v
+Inspect actual .zst ACL
+              |
+              v
+New file has restrictive permissions
+              |
+              v
+Default ACL alone not sufficient
+              |
+              v
+Create systemd ACL service
+              |
+              v
+Create systemd path unit
+              |
+              v
+Monitor coredump directory
+              |
+              v
+Automatically execute setfacl
+              |
+              v
+Validate new coredump
+              |
+              v
+dev_oss access successful
 ```
 
 ---
 
-# 13. Commands Used
+# 17. Important Security Consideration
 
-### Check directory permissions
+The implemented service currently applies:
 
 ```bash
-ls -ld /var/lib/systemd/coredump/
+u:dev_oss:rwx,m:rwx
 ```
 
-### Check ACL
+to **all regular files** under:
+
+```text
+/var/lib/systemd/coredump/
+```
+
+because the command uses:
+
+```bash
+find /var/lib/systemd/coredump/ -type f
+```
+
+This should therefore be reviewed carefully in a production environment.
+
+Coredump files may contain sensitive application memory, credentials, tokens, configuration information, or customer data.
+
+A more restrictive implementation could grant only the permissions actually required by the support user.
+
+For example, if `dev_oss` only needs to read compressed coredumps, consider:
+
+```bash
+setfacl -m u:dev_oss:r,m:rwx <file>
+```
+
+with the exact ACL/mask design validated against the application's operational requirement.
+
+The portfolio implementation should document the **business requirement for `rwx`** if full access is intentionally required.
+
+---
+
+# 18. Best Practices
+
+* Always inspect the ACL mask using `getfacl`.
+* Distinguish directory ACLs from file ACLs.
+* Use default ACLs when inheritance is required.
+* Validate the ACL on newly generated files.
+* Automate repetitive remediation when manual intervention is operationally undesirable.
+* Use systemd `.path` units for event-driven filesystem monitoring.
+* Use `systemd` services for controlled remediation actions.
+* Avoid `chmod 777`.
+* Avoid unrestricted sudo access.
+* Protect coredump data because it can contain sensitive process memory.
+* Review the permissions granted by automated ACL remediation.
+* Test the automation after system reboot.
+* Verify the `.path` unit remains enabled and active.
+* Validate the actual access as `dev_oss`.
+
+---
+
+# 19. Validation Checklist
+
+```text
+[✓] Directory ACL verified
+[✓] ACL mask corrected
+[✓] Default ACL configured
+[✓] New coredump generated
+[✓] New file permissions investigated
+[✓] Default ACL found insufficient for required operational access
+[✓] systemd ACL service created
+[✓] systemd path unit created
+[✓] Path unit enabled
+[✓] Path unit started
+[✓] ACL automatically applied to coredump files
+[✓] Access tested as dev_oss
+[✓] Coredump decompression validated
+```
+
+---
+
+# 20. Commands Used
+
+### Check directory ACL
 
 ```bash
 getfacl /var/lib/systemd/coredump/
 ```
 
-### Add user ACL
-
-```bash
-setfacl -R -m u:dev_oss:rwx /var/lib/systemd/coredump/
-```
-
-### Correct ACL mask
+### Correct current ACL
 
 ```bash
 setfacl -m u:dev_oss:rwx,m:rwx /var/lib/systemd/coredump/
 ```
 
-### Check individual coredump ACL
+### Configure default ACL
 
 ```bash
-getfacl /var/lib/systemd/coredump/<coredump-file>.zst
+setfacl -m d:u:dev_oss:rwx,d:m:rwx /var/lib/systemd/coredump/
 ```
 
-### Check user identity
+### Check file ACL
 
 ```bash
-id dev_oss
+getfacl /var/lib/systemd/coredump/<coredump>.zst
 ```
 
-### Check sudo authorization
+### Reload systemd
 
 ```bash
-sudo -l
+systemctl daemon-reload
+```
+
+### Enable path monitoring
+
+```bash
+systemctl enable coredump-acl.path
+```
+
+### Start path monitoring
+
+```bash
+systemctl start coredump-acl.path
+```
+
+### Check path unit
+
+```bash
+systemctl status coredump-acl.path
+```
+
+### Check remediation service
+
+```bash
+systemctl status coredump-acl.service
+```
+
+### Check service logs
+
+```bash
+journalctl -u coredump-acl.service
+```
+
+### Check path logs
+
+```bash
+journalctl -u coredump-acl.path
 ```
 
 ### Test user access
@@ -473,185 +738,97 @@ su - dev_oss
 cd /var/lib/systemd/coredump/
 ```
 
-### Analyze coredump
+### Decompress coredump
 
 ```bash
 zstd -d <coredump-file>.zst
 ```
----
-
-# 14. Persistent Default ACL for Future Coredump Files
-Default ACL Inheritance
-
-To ensure that the dev_oss permission is automatically inherited by future files and directories created under the coredump directory, configure a default ACL:
-
-setfacl -m d:u:dev_oss:rx,d:m:rx /var/lib/systemd/coredump/
-What this does
-d:u:dev_oss:rx
-
-Configures a default ACL granting dev_oss read and execute permissions on newly created objects under the directory.
-
-d:m:rx
-
-Sets the default ACL mask, which controls the maximum effective permission for the inherited named-user/group ACL entries.
-
-Verify
-getfacl /var/lib/systemd/coredump/
-
-Expected output should include:
-
-user::rwx
-user:dev_oss:r-x
-group::r-x
-mask::r-x
-other::r-x
-
-default:user::rwx
-default:user:dev_oss:r-x
-default:group::r-x
-default:mask::r-x
-default:other::r-x
-Important
-
-The d: prefix means these are default ACL entries for future objects.
-
-u:dev_oss:rx     → Current directory ACL
-d:u:dev_oss:rx   → Default ACL for future objects
-
-m:rx             → Current ACL mask
-d:m:rx           → Default ACL mask for future objects
-
-This configuration is intended for future inheritance. Existing coredump files are not automatically modified; their individual ACLs must be checked separately with:
-
-getfacl /var/lib/systemd/coredump/<coredump-file>.zst
-
-For a support user who only needs to read and analyze coredumps, rx on the directory follows the principle of least privilege.
----
-
-# 15. Security Considerations
-
-Coredumps can contain sensitive application information, including:
-
-* Application memory
-* Configuration data
-* Runtime information
-* Credentials or tokens present in process memory
-* Customer/application data
-
-Therefore, broad permissions such as:
-
-```bash
-chmod 777 /var/lib/systemd/coredump/
-```
-
-should **not** be used as a troubleshooting shortcut.
-
-Similarly, unrestricted sudo access should not be granted just to solve an application-support requirement.
-
-ACLs provide a more controlled method of granting access to specific users.
 
 ---
 
-# 16. Best Practices
+# 21. Root Cause Analysis
 
-* Use ACLs instead of broad `777` permissions.
-* Always inspect the ACL mask.
-* Check `#effective` permissions in `getfacl` output.
-* Distinguish directory permissions from file permissions.
-* Check individual coredump ACLs when file access fails.
-* Use least-privilege sudo rules.
-* Avoid unrestricted `sudo` access.
-* Protect coredump files because they may contain sensitive information.
-* Periodically clean up old coredumps according to the system retention policy.
-* Document privileged access requirements.
-* Validate permissions as the affected user rather than assuming the ACL is correct.
+### Initial Root Cause
 
----
-
-# 17. Key Learning
-
-The main lesson from this incident was that an ACL entry alone does not guarantee the requested effective permission.
-
-For example:
+The directory ACL contained a restrictive ACL mask:
 
 ```text
 user:dev_oss:rwx
 mask::r-x
 ```
 
-does **not** provide effective `rwx`.
+which reduced the effective permission.
 
-The effective permission is constrained by the mask:
+### Second Root Cause
 
-```text
-user:dev_oss:rwx
-       +
-mask::r-x
-       =
-effective:r-x
-```
+After correcting the ACL mask and configuring a default ACL, newly generated coredump files were still observed with restrictive permissions.
 
-After correcting the mask:
+Therefore, the default ACL configuration alone did not provide the required operational access to the generated coredump files in this environment.
+
+### Final Corrective Action
+
+A systemd event-driven ACL remediation mechanism was implemented:
 
 ```text
-user:dev_oss:rwx
-mask::rwx
+systemd-coredump
+       |
+       v
+Coredump directory changes
+       |
+       v
+coredump-acl.path
+       |
+       v
+coredump-acl.service
+       |
+       v
+find + setfacl
+       |
+       v
+dev_oss access
 ```
 
-the user receives the intended effective permissions.
-
-A second important lesson is that:
-
-```text
-ACL
-```
-
-and:
-
-```text
-sudoers
-```
-
-solve different authorization problems.
-
-A user can have sufficient filesystem permissions while still being prohibited from executing a command through `sudo`.
+This automated the ACL correction whenever the coredump directory changed.
 
 ---
 
-# 18. Outcome
+# 22. Outcome
 
-The coredump directory ACL was corrected by explicitly granting `dev_oss` `rwx` permissions and updating the ACL mask to `rwx`.
+The issue was resolved by implementing a layered permission and automation approach:
 
-The final ACL was verified successfully:
+1. Corrected the ACL mask.
+2. Granted the required ACL to `dev_oss`.
+3. Configured a default ACL for future objects.
+4. Observed that newly generated coredump files could still have restrictive permissions.
+5. Implemented a systemd `.path` unit to monitor the coredump directory.
+6. Implemented a systemd oneshot service to automatically apply the required ACL.
+7. Eliminated the need for manual `setfacl` execution after every coredump.
+8. Validated access from the affected `dev_oss` account.
 
-```text
-user:dev_oss:rwx
-mask::rwx
-```
-
-The investigation also identified the separate sudoers restriction preventing `dev_oss` from executing `/bin/zstd` with elevated 
-privileges.
-
-The incident demonstrated a structured Linux permission troubleshooting methodology covering:
-
-* POSIX ACLs
-* ACL masks
-* Effective permissions
-* Directory vs file permissions
-* Sudo authorization
-* Least-privilege access
-* Application coredump handling
+This incident demonstrates practical production experience with **Linux ACLs, systemd-coredump, systemd path units, automated remediation, filesystem permissions, and production troubleshooting**.
 
 ---
 
-# Technologies Used
+# 23. Technologies Used
 
-* RHEL / Enterprise Linux
-* POSIX ACL
-* `getfacl`
-* `setfacl`
-* `zstd`
-* `sudo`
-* systemd-coredump
-* Linux filesystem permissions
-* Shell troubleshooting
+```text
+RHEL
+Linux
+POSIX ACL
+getfacl
+setfacl
+systemd
+systemd-coredump
+systemd.path
+systemd.service
+zstd
+sudo
+Linux Filesystem Permissions
+Shell Scripting
+Production Troubleshooting
+Incident Management
+Root Cause Analysis
+Automated Remediation
+```
+
+---

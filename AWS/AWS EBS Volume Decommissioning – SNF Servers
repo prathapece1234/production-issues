@@ -1,0 +1,413 @@
+# AWS EBS Volume Decommissioning – SNF Servers
+
+## Overview
+
+As part of AWS infrastructure cost optimization and resource cleanup, unused **390 GiB EBS volumes** attached to the following servers 
+were identified:
+
+| Server | Management IP | EBS Volume Size | Mount Paths                 |
+| ------ | ------------- | --------------: | --------------------------- |
+| SNF-1  | `10.63.8.139` |         390 GiB | `/apps`, `/loggers`, `swap` |
+| SNF-2  | `10.63.9.53`  |         390 GiB | `/apps`, `/loggers`, `swap` |
+
+AWS recommendations indicated that these EBS volumes had **not been utilized since September**.
+
+Before deletion, the required files from both servers were copied to an **S3 bucket** for backup and recovery purposes.
+
+---
+
+# Objective
+
+The objective was to:
+
+* Identify unused EBS volumes.
+* Verify that the associated filesystem data was no longer required.
+* Create a backup of the required data.
+* Preserve the data in S3.
+* Remove the unused 390 GiB EBS volumes.
+* Reduce unnecessary AWS storage consumption and associated cost.
+
+---
+
+# Server Details
+
+### SNF-1
+
+```text
+Server     : SNF-1
+IP Address : 10.63.8.139
+Volume     : 390 GiB
+Paths      : /apps
+             /loggers
+             swap
+```
+
+### SNF-2
+
+```text
+Server     : SNF-2
+IP Address : 10.63.9.53
+Volume     : 390 GiB
+Paths      : /apps
+             /loggers
+             swap
+```
+
+---
+
+# Pre-Deletion Validation
+
+Before deleting the volumes, the server-side mount points were checked.
+
+### Check mounted filesystems
+
+```bash
+df -h
+```
+
+### Identify the mounted devices
+
+```bash
+lsblk
+```
+
+Example:
+
+```bash
+lsblk -f
+```
+
+This was used to identify which EBS device was associated with:
+
+```text
+/apps
+/loggers
+swap
+```
+
+### Check filesystem utilization
+
+```bash
+df -h /apps
+df -h /loggers
+```
+
+### Check swap
+
+```bash
+swapon --show
+```
+
+Also verify:
+
+```bash
+free -h
+```
+
+---
+
+# Backup to S3
+
+Before removing the EBS volumes, the required data from both servers was copied to an S3 bucket.
+
+The backup was performed to ensure that the data could be recovered if required after volume deletion.
+
+Example validation:
+
+```bash
+aws s3 ls s3://<bucket-name>/
+```
+
+For application data:
+
+```bash
+aws s3 ls s3://<bucket-name>/SNF-1/
+aws s3 ls s3://<bucket-name>/SNF-2/
+```
+
+The actual bucket name should be kept according to the organization's internal configuration.
+
+---
+
+# Backup Validation
+
+Before proceeding with deletion, the S3 backup was cross-checked to confirm that the required files were available.
+
+Validation included:
+
+```bash
+aws s3 ls s3://<bucket-name>/SNF-1/ --recursive
+```
+
+and:
+
+```bash
+aws s3 ls s3://<bucket-name>/SNF-2/ --recursive
+```
+
+The purpose was to ensure that the required data had been successfully copied before removing the EBS volumes.
+
+---
+
+# EBS Volume Identification
+
+From the AWS EC2 console:
+
+```text
+EC2
+ ↓
+Instances
+ ↓
+SNF-1 / SNF-2
+ ↓
+Storage
+ ↓
+Identify 390 GiB EBS Volume
+```
+
+The volume was cross-checked against the device identified from Linux:
+
+```bash
+lsblk
+```
+
+This step is important to avoid accidentally deleting the wrong EBS volume.
+
+---
+
+# Decommissioning Process
+
+After confirming the backup and verifying that the volumes were no longer required:
+
+```text
+SNF-1
+  ↓
+Verify 390 GiB EBS
+  ↓
+Backup data to S3
+  ↓
+Validate S3 backup
+  ↓
+Unmount filesystems
+  ↓
+Disable swap
+  ↓
+Remove persistent mount configuration
+  ↓
+Detach EBS volume
+  ↓
+Delete EBS volume
+```
+
+The same process was followed for `SNF-2`.
+
+---
+
+# Linux Cleanup
+
+Before detaching the volume, the relevant mount points were unmounted.
+
+```bash
+umount /apps
+umount /loggers
+```
+
+If swap was configured on the volume:
+
+```bash
+swapoff <swap-device>
+```
+
+Verify:
+
+```bash
+swapon --show
+```
+
+---
+
+# `/etc/fstab` Validation
+
+Before removing the volume, check for persistent mount entries:
+
+```bash
+cat /etc/fstab
+```
+
+or:
+
+```bash
+grep -E '/apps|/loggers|swap' /etc/fstab
+```
+
+Any obsolete entries associated with the removed EBS volume should be removed or updated as part of the decommissioning activity.
+
+---
+
+# AWS EBS Detachment
+
+From the AWS console:
+
+```text
+EC2
+ ↓
+Volumes
+ ↓
+Select 390 GiB Volume
+ ↓
+Actions
+ ↓
+Detach Volume
+```
+
+After detachment, verify that the volume is no longer attached to the instance.
+
+---
+
+# EBS Volume Deletion
+
+After confirming:
+
+* Data backup completed
+* S3 backup validated
+* Correct EBS volume identified
+* Filesystems unmounted
+* Swap disabled
+* Volume detached
+
+the unused EBS volume can be deleted:
+
+```text
+EC2
+ ↓
+Volumes
+ ↓
+Select detached volume
+ ↓
+Actions
+ ↓
+Delete volume
+```
+
+---
+
+# Post-Deletion Validation
+
+After deletion, verify the server:
+
+```bash
+lsblk
+```
+
+```bash
+df -h
+```
+
+```bash
+free -h
+```
+
+```bash
+swapon --show
+```
+
+Also verify that the application/services are not dependent on the removed storage.
+
+---
+
+# Important Safety Checks
+
+Before deleting an EBS volume, always verify:
+
+```text
+✓ Correct instance
+✓ Correct EBS volume
+✓ Correct volume size
+✓ Correct device mapping
+✓ Mount points identified
+✓ Application dependency checked
+✓ Required files backed up
+✓ S3 backup validated
+✓ Filesystems unmounted
+✓ Swap disabled if applicable
+✓ /etc/fstab reviewed
+✓ Volume detached
+✓ Final deletion approved
+```
+
+Deleting an EBS volume is a destructive operation. The backup and volume-to-device mapping should therefore be validated before deletion.
+
+---
+
+# Cost Optimization
+
+The activity helps reduce unnecessary AWS storage consumption by removing EBS capacity that was identified as unused.
+
+Total storage identified for removal:
+
+```text
+SNF-1 : 390 GiB
+SNF-2 : 390 GiB
+----------------
+Total : 780 GiB
+```
+
+Therefore, **780 GiB of EBS capacity** was identified for decommissioning across the two servers.
+
+---
+
+# Change / Incident Summary
+
+```text
+Activity:
+EBS Volume Decommissioning
+
+Servers:
+SNF-1 - 10.63.8.139
+SNF-2 - 10.63.9.53
+
+Volume:
+390 GiB per server
+
+Total Capacity:
+780 GiB
+
+Mount Points:
+ /apps
+ /loggers
+ swap
+
+Reason:
+Volumes were identified as unused since September.
+
+Backup:
+Required data copied to S3 before deletion.
+
+Action:
+EBS volumes detached and removed after validation.
+
+Result:
+Unused EBS capacity decommissioned and AWS storage
+consumption optimized.
+```
+
+---
+
+# Skills Demonstrated
+
+* AWS EC2
+* AWS EBS
+* EBS Volume Identification
+* Linux Filesystem Management
+* `lsblk`
+* `df`
+* `mount` / `umount`
+* Linux Swap Management
+* `/etc/fstab`
+* Amazon S3 Backup
+* AWS Cost Optimization
+* Infrastructure Decommissioning
+* Production Change Management
+* Backup Validation
+* Risk Assessment
+* Post-Change Validation
